@@ -202,9 +202,9 @@ class _ConversationTile extends StatelessWidget {
         ],
       ),
       onTap: () {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Opening ${conv.name}')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Opening ${conv.name}')));
       },
     );
   }
@@ -233,8 +233,9 @@ class _ChatBubble extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
-        mainAxisAlignment:
-            message.isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
+        mainAxisAlignment: message.isMe
+            ? MainAxisAlignment.end
+            : MainAxisAlignment.start,
         children: [
           if (!message.isMe) ...[
             Text(message.avatar, style: const TextStyle(fontSize: 20)),
@@ -278,10 +279,7 @@ class _ChatInputBar extends StatelessWidget {
       padding: const EdgeInsets.all(16),
       child: Row(
         children: [
-          IconButton(
-            icon: const Icon(Icons.add),
-            onPressed: () {},
-          ),
+          IconButton(icon: const Icon(Icons.add), onPressed: () {}),
           Expanded(
             child: TextField(
               controller: controller,

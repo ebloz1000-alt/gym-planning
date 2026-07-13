@@ -64,7 +64,11 @@ class MockRepository {
       durationDays: 1,
       price: 400,
       highlight: false,
-      features: ['Single day access', 'Equipment booking', 'Locker access'],
+      features: [
+        'Single day access',
+        'Equipment booking',
+        'Pay Later until 12:00 PM',
+      ],
     ),
     MembershipPlan(
       name: 'Weekly',
@@ -110,7 +114,7 @@ class MockRepository {
     ),
   ];
 
-  final List<EquipmentItem> equipment = const [
+  final List<EquipmentItem> _equipment = [
     EquipmentItem(
       id: 'eq-1',
       name: 'Treadmill Pro X',
@@ -273,7 +277,7 @@ class MockRepository {
       id: 'pay-1003',
       method: 'Cash',
       amount: 400,
-      status: PaymentStatus.confirmed,
+      status: PaymentStatus.pending,
       createdAt: DateTime.now().subtract(const Duration(days: 4)),
       reference: 'CASH-9044',
     ),
@@ -386,6 +390,7 @@ class MockRepository {
   ];
 
   List<AppUser> get users => List.unmodifiable(_users);
+  List<EquipmentItem> get equipment => List.unmodifiable(_equipment);
   List<Booking> get bookings => List.unmodifiable(_bookings);
   List<PaymentRecord> get payments => List.unmodifiable(_payments);
   List<AppNotification> get notifications => List.unmodifiable(_notifications);
@@ -395,6 +400,37 @@ class MockRepository {
       _users.firstWhere((user) => user.role == role);
 
   MembershipRecord get currentMembership => membershipHistory.first;
+  MembershipRecord? get activeMembership {
+    for (final membership in membershipHistory) {
+      if (membership.isBookable) return membership;
+    }
+    return null;
+  }
+
+  bool get hasBookableMembership => activeMembership != null;
+
+  MembershipPlan membershipPlanByName(String name) {
+    return membershipPlans.firstWhere((plan) => plan.name == name);
+  }
+
+  MembershipRecord renewMembership({
+    required MembershipPlan plan,
+    required int durationDays,
+    PaymentStatus paymentStatus = PaymentStatus.confirmed,
+    DateTime? paymentDueAt,
+  }) {
+    final now = DateTime.now();
+    final record = MembershipRecord(
+      plan: plan.name,
+      startedAt: now,
+      expiresAt: now.add(Duration(days: durationDays)),
+      status: 'Active',
+      paymentStatus: paymentStatus,
+      paymentDueAt: paymentDueAt,
+    );
+    membershipHistory.insert(0, record);
+    return record;
+  }
 
   void addBooking(Booking booking) {
     _bookings.insert(0, booking);
@@ -407,8 +443,64 @@ class MockRepository {
     }
   }
 
+  int expireOverduePayLater(DateTime now) {
+    if (membershipHistory.isEmpty) return 0;
+    final current = membershipHistory.first;
+    final dueAt = current.paymentDueAt;
+    if (current.paymentStatus != PaymentStatus.payLater ||
+        dueAt == null ||
+        dueAt.isAfter(now)) {
+      return 0;
+    }
+
+    membershipHistory[0] = current.copyWith(
+      status: 'Expired',
+      paymentStatus: PaymentStatus.expired,
+    );
+
+    final beforeBookings = _bookings.length;
+    _bookings.removeWhere(
+      (booking) =>
+          booking.paymentStatus == PaymentStatus.payLater &&
+          booking.status != BookingStatus.completed,
+    );
+
+    for (var i = 0; i < _payments.length; i++) {
+      final payment = _payments[i];
+      if (payment.method == 'Pay Later' &&
+          payment.status == PaymentStatus.pending &&
+          !payment.createdAt.isAfter(dueAt)) {
+        _payments[i] = payment.copyWith(status: PaymentStatus.expired);
+      }
+    }
+
+    return 1 + beforeBookings - _bookings.length;
+  }
+
   void addPayment(PaymentRecord payment) {
     _payments.insert(0, payment);
+  }
+
+  void updatePayment(PaymentRecord payment) {
+    final index = _payments.indexWhere((item) => item.id == payment.id);
+    if (index != -1) {
+      _payments[index] = payment;
+    }
+  }
+
+  void addEquipment(EquipmentItem item) {
+    _equipment.insert(0, item);
+  }
+
+  void updateEquipment(EquipmentItem item) {
+    final index = _equipment.indexWhere((existing) => existing.id == item.id);
+    if (index != -1) {
+      _equipment[index] = item;
+    }
+  }
+
+  void deleteEquipment(EquipmentItem item) {
+    _equipment.removeWhere((existing) => existing.id == item.id);
   }
 
   void markNotificationRead(String id) {

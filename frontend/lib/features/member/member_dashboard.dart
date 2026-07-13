@@ -8,7 +8,16 @@ import '../../models/app_models.dart';
 import '../../providers_or_bloc/app_state.dart';
 
 class MemberDashboard extends StatelessWidget {
-  const MemberDashboard({super.key});
+  const MemberDashboard({
+    super.key,
+    this.onQuickBook,
+    this.onRenew,
+    this.onFeedback,
+  });
+
+  final VoidCallback? onQuickBook;
+  final VoidCallback? onRenew;
+  final VoidCallback? onFeedback;
 
   @override
   Widget build(BuildContext context) {
@@ -71,6 +80,10 @@ class MemberDashboard extends StatelessWidget {
                     ),
                   ),
                   StatusBadge(label: membership.status),
+                  if (membership.paymentStatus != PaymentStatus.confirmed) ...[
+                    const SizedBox(width: 8),
+                    StatusBadge(label: membership.paymentStatus.label),
+                  ],
                 ],
               ),
               const SizedBox(height: 10),
@@ -89,13 +102,13 @@ class MemberDashboard extends StatelessWidget {
                   AppButton(
                     label: 'Quick Book',
                     icon: Icons.event_available_outlined,
-                    onPressed: () {},
+                    onPressed: () => _handleQuickBook(context, state),
                   ),
                   AppButton(
                     label: 'Renew',
                     icon: Icons.restart_alt_outlined,
                     variant: AppButtonVariant.secondary,
-                    onPressed: () {},
+                    onPressed: onRenew,
                   ),
                 ],
               ),
@@ -103,7 +116,22 @@ class MemberDashboard extends StatelessWidget {
           ),
         ),
         const SectionHeader(title: 'Upcoming sessions'),
-        ...upcoming.map((booking) => BookingTile(booking: booking)),
+        ...upcoming.map(
+          (booking) => BookingTile(booking: booking, showPaymentStatus: true),
+        ),
+        const SectionHeader(title: 'Member feedback'),
+        AppCard(
+          child: ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.rate_review_outlined),
+            title: const Text('Share your gym feedback'),
+            subtitle: const Text(
+              'Rate trainers, equipment, and your session experience.',
+            ),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: onFeedback,
+          ),
+        ),
         const SectionHeader(title: 'Recent notifications'),
         ...repo.notifications
             .take(3)
@@ -122,5 +150,18 @@ class MemberDashboard extends StatelessWidget {
             ),
       ],
     );
+  }
+
+  void _handleQuickBook(BuildContext context, AppState state) {
+    if (state.hasBookableMembership) {
+      onQuickBook?.call();
+      return;
+    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Renew or select a membership plan before booking.'),
+      ),
+    );
+    onRenew?.call();
   }
 }

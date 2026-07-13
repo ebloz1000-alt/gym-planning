@@ -347,11 +347,13 @@ class BookingTile extends StatelessWidget {
     required this.booking,
     this.onCancel,
     this.onTap,
+    this.showPaymentStatus = true,
   });
 
   final Booking booking;
   final VoidCallback? onCancel;
   final VoidCallback? onTap;
+  final bool showPaymentStatus;
 
   @override
   Widget build(BuildContext context) {
@@ -368,13 +370,31 @@ class BookingTile extends StatelessWidget {
           '${formatDate(booking.date)} at ${booking.timeSlot}\nTrainer: ${booking.trainerName}',
         ),
         isThreeLine: true,
-        trailing: Column(
+        trailing: Row(
           mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.end,
           children: [
-            StatusBadge(label: booking.status.label, compact: true),
-            const SizedBox(height: 6),
-            StatusBadge(label: booking.paymentStatus.label, compact: true),
+            Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                StatusBadge(label: booking.status.label, compact: true),
+                if (showPaymentStatus) ...[
+                  const SizedBox(height: 6),
+                  StatusBadge(
+                    label: booking.paymentStatus.label,
+                    compact: true,
+                  ),
+                ],
+              ],
+            ),
+            if (onCancel != null) ...[
+              const SizedBox(width: 8),
+              IconButton(
+                tooltip: 'Cancel booking',
+                onPressed: onCancel,
+                icon: const Icon(Icons.cancel_outlined),
+              ),
+            ],
           ],
         ),
       ),

@@ -3,7 +3,9 @@ import 'package:flutter/material.dart';
 import '../../core/utils/formatters.dart';
 import '../../core/widgets/app_button.dart';
 import '../../core/widgets/app_cards.dart';
+import '../../core/widgets/app_fields.dart';
 import '../../core/widgets/status_badge.dart';
+import '../../models/app_models.dart';
 import '../../providers_or_bloc/app_state.dart';
 
 class MembershipScreen extends StatefulWidget {
@@ -14,14 +16,31 @@ class MembershipScreen extends StatefulWidget {
 }
 
 class _MembershipScreenState extends State<MembershipScreen> {
+  final _paymentKey = GlobalKey<FormState>();
+  final _mpesaPhone = TextEditingController();
+
   String _selectedPlan = 'Monthly';
+  String _paymentMethod = 'M-Pesa';
   int _vipDuration = 45;
+  bool _isRenewing = false;
+
+  @override
+  void dispose() {
+    _mpesaPhone.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     final state = AppScope.watch(context);
     final repo = state.repository;
     final current = repo.currentMembership;
+    final currentStatus = current.isBookable ? current.status : 'Expired';
+    final selectedPlan = repo.membershipPlanByName(_selectedPlan);
+    final selectedPrice = _priceFor(selectedPlan);
+    final selectedDuration = selectedPlan.name == 'VIP'
+        ? _vipDuration
+        : selectedPlan.durationDays;
     return FeaturePage(
       title: 'Membership',
       subtitle: 'Plans, renewals, countdowns, and membership history.',
@@ -38,7 +57,7 @@ class _MembershipScreenState extends State<MembershipScreen> {
                       style: Theme.of(context).textTheme.titleLarge,
                     ),
                   ),
-                  StatusBadge(label: current.status),
+                  StatusBadge(label: currentStatus),
                 ],
               ),
               const SizedBox(height: 8),
@@ -52,6 +71,27 @@ class _MembershipScreenState extends State<MembershipScreen> {
               ),
               const SizedBox(height: 10),
               Text(formatCountdown(current.expiresAt)),
+              if (current.paymentStatus != PaymentStatus.confirmed) ...[
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    StatusBadge(label: current.paymentStatus.label),
+                    if (current.paymentDueAt != null)
+                      Chip(
+                        label: Text(
+                          'Due 12:00 PM, ${formatDate(current.paymentDueAt!)}',
+                        ),
+                      ),
+                  ],
+                ),
+              ],
+              const SizedBox(height: 8),
+              Text(
+                'Booking access is unlocked only while this membership is active.',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
             ],
           ),
         ),
@@ -77,12 +117,18 @@ class _MembershipScreenState extends State<MembershipScreen> {
                     ChoiceChip(
                       label: Text(selected ? 'Selected' : 'Choose'),
                       selected: selected,
-                      onSelected: (_) =>
-                          setState(() => _selectedPlan = plan.name),
+                      onSelected: (_) => _selectPlan(plan.name),
                     ),
                   ],
                 ),
                 Text('${plan.durationDays} days - ${formatMoney(price)}'),
+                if (plan.name == 'Daily') ...[
+                  const SizedBox(height: 6),
+                  Text(
+                    'Daily members may choose Pay Later and book sessions until the 12:00 PM payment deadline.',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ],
                 const SizedBox(height: 8),
                 Wrap(
                   spacing: 8,
@@ -112,11 +158,87 @@ class _MembershipScreenState extends State<MembershipScreen> {
             ),
           );
         }),
-        AppButton(
-          label: 'Renew $_selectedPlan',
-          icon: Icons.workspace_premium_outlined,
-          expand: true,
-          onPressed: () {},
+        AppCard(
+          child: Form(
+            key: _paymentKey,
+            autovalidateMode: AutovalidateMode.onUserInteraction,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Membership payment',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  _paymentInstructions(selectedPlan),
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
+                const SizedBox(height: 14),
+                SegmentedButton<String>(
+                  segments: [
+                    const ButtonSegment(
+                      value: 'M-Pesa',
+                      icon: Icon(Icons.phone_android_outlined),
+                      label: Text('M-Pesa'),
+                    ),
+                    const ButtonSegment(
+                      value: 'Cash',
+                      icon: Icon(Icons.payments_outlined),
+                      label: Text('Cash'),
+                    ),
+                    if (selectedPlan.name == 'Daily')
+                      const ButtonSegment(
+                        value: 'Pay Later',
+                        icon: Icon(Icons.schedule_outlined),
+                        label: Text('Later'),
+                      ),
+                  ],
+                  selected: {_paymentMethod},
+                  onSelectionChanged: (value) =>
+                      setState(() => _paymentMethod = value.first),
+                ),
+                if (_paymentMethod == 'M-Pesa') ...[
+                  const SizedBox(height: 14),
+                  AppTextField(
+                    label: 'M-Pesa Phone Number',
+                    hint: '+254 700 000 000',
+                    controller: _mpesaPhone,
+                    icon: Icons.phone_android_outlined,
+                    keyboardType: TextInputType.phone,
+                    validator: _validateMpesaPhone,
+                  ),
+                ],
+                const SizedBox(height: 14),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        '$_selectedPlan - $selectedDuration days',
+                        style: Theme.of(context).textTheme.labelLarge,
+                      ),
+                    ),
+                    Text(
+                      formatMoney(selectedPrice),
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                AppButton(
+                  label: _submitLabel,
+                  icon: _paymentMethod == 'Pay Later'
+                      ? Icons.schedule_outlined
+                      : _paymentMethod == 'Cash'
+                      ? Icons.payments_outlined
+                      : Icons.workspace_premium_outlined,
+                  expand: true,
+                  isLoading: _isRenewing,
+                  onPressed: () => _submitRenewal(state),
+                ),
+              ],
+            ),
+          ),
         ),
         const SectionHeader(title: 'Membership history'),
         ...repo.membershipHistory.map(
@@ -128,7 +250,12 @@ class _MembershipScreenState extends State<MembershipScreen> {
               subtitle: Text(
                 '${formatDate(item.startedAt)} - ${formatDate(item.expiresAt)}',
               ),
-              trailing: StatusBadge(label: item.status, compact: true),
+              trailing: StatusBadge(
+                label: item.paymentStatus == PaymentStatus.confirmed
+                    ? item.status
+                    : item.paymentStatus.label,
+                compact: true,
+              ),
             ),
           ),
         ),
@@ -155,5 +282,85 @@ class _MembershipScreenState extends State<MembershipScreen> {
         ),
       ],
     );
+  }
+
+  double _priceFor(MembershipPlan plan) {
+    if (plan.name != 'VIP') return plan.price;
+    return plan.price * (_vipDuration / plan.durationDays);
+  }
+
+  void _selectPlan(String name) {
+    setState(() {
+      _selectedPlan = name;
+      if (name != 'Daily' && _paymentMethod == 'Pay Later') {
+        _paymentMethod = 'M-Pesa';
+      }
+    });
+  }
+
+  String _paymentInstructions(MembershipPlan plan) {
+    if (_paymentMethod == 'Cash') {
+      return 'Submit the ${plan.name} cash amount for admin approval. The admin activates the membership after confirming the cash payment.';
+    }
+    if (_paymentMethod == 'Pay Later') {
+      return 'Daily Pay Later unlocks booking now. If payment is not made by 12:00 PM, booked sessions are removed and released.';
+    }
+    return 'Enter your M-Pesa number to receive an STK Push, then confirm with your PIN.';
+  }
+
+  String get _submitLabel {
+    if (_paymentMethod == 'Cash') return 'Submit Cash for Admin Approval';
+    if (_paymentMethod == 'Pay Later') return 'Activate Daily Pay Later';
+    return 'Send STK & Renew $_selectedPlan';
+  }
+
+  String? _validateMpesaPhone(String? value) {
+    final phone = (value ?? '').trim().replaceAll(RegExp(r'[\s-]'), '');
+    final isValid = RegExp(r'^(\+254|254|0)\d{9}$').hasMatch(phone);
+    if (!isValid) return 'Enter a valid M-Pesa phone number.';
+    return null;
+  }
+
+  Future<void> _submitRenewal(AppState state) async {
+    if (_paymentMethod == 'M-Pesa' &&
+        !(_paymentKey.currentState?.validate() ?? false)) {
+      return;
+    }
+    final plan = state.repository.membershipPlanByName(_selectedPlan);
+    final durationDays = plan.name == 'VIP' ? _vipDuration : plan.durationDays;
+    setState(() => _isRenewing = true);
+    final amount = _priceFor(plan);
+    if (_paymentMethod == 'Pay Later') {
+      await state.activateDailyPayLater(
+        plan: plan,
+        durationDays: durationDays,
+        amount: amount,
+      );
+    } else if (_paymentMethod == 'Cash') {
+      state.submitCashMembershipPayment(plan: plan, amount: amount);
+      await Future<void>.delayed(const Duration(milliseconds: 250));
+    } else {
+      await state.renewMembership(
+        plan: plan,
+        durationDays: durationDays,
+        phone: _mpesaPhone.text.trim(),
+        amount: amount,
+      );
+    }
+    if (!mounted) return;
+    setState(() => _isRenewing = false);
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(_successMessage)));
+  }
+
+  String get _successMessage {
+    if (_paymentMethod == 'Cash') {
+      return 'Cash payment submitted. Admin approval will activate your $_selectedPlan membership.';
+    }
+    if (_paymentMethod == 'Pay Later') {
+      return 'Daily Pay Later is active. Pay before 12:00 PM to keep booked sessions.';
+    }
+    return 'STK confirmed. Your $_selectedPlan membership is active for booking.';
   }
 }

@@ -113,12 +113,58 @@ class MembershipRecord {
     required this.startedAt,
     required this.expiresAt,
     required this.status,
+    this.paymentStatus = PaymentStatus.confirmed,
+    this.paymentDueAt,
   });
 
   final String plan;
   final DateTime startedAt;
   final DateTime expiresAt;
   final String status;
+  final PaymentStatus paymentStatus;
+  final DateTime? paymentDueAt;
+
+  bool get isBookable {
+    final now = DateTime.now();
+    final paymentOpen =
+        paymentStatus != PaymentStatus.payLater ||
+        paymentDueAt == null ||
+        paymentDueAt!.isAfter(now);
+    return status.toLowerCase() == 'active' &&
+        expiresAt.isAfter(now) &&
+        paymentOpen;
+  }
+
+  bool get isPayLater => paymentStatus == PaymentStatus.payLater;
+
+  bool get isPayLaterOverdue {
+    final dueAt = paymentDueAt;
+    return isPayLater && dueAt != null && !dueAt.isAfter(DateTime.now());
+  }
+
+  int get daysRemaining {
+    final remaining = expiresAt.difference(DateTime.now());
+    if (remaining.isNegative) return 0;
+    return (remaining.inMinutes + 1439) ~/ 1440;
+  }
+
+  MembershipRecord copyWith({
+    String? plan,
+    DateTime? startedAt,
+    DateTime? expiresAt,
+    String? status,
+    PaymentStatus? paymentStatus,
+    DateTime? paymentDueAt,
+  }) {
+    return MembershipRecord(
+      plan: plan ?? this.plan,
+      startedAt: startedAt ?? this.startedAt,
+      expiresAt: expiresAt ?? this.expiresAt,
+      status: status ?? this.status,
+      paymentStatus: paymentStatus ?? this.paymentStatus,
+      paymentDueAt: paymentDueAt ?? this.paymentDueAt,
+    );
+  }
 }
 
 class EquipmentItem {
@@ -145,6 +191,29 @@ class EquipmentItem {
   final String description;
 
   int get available => capacity - booked;
+
+  EquipmentItem copyWith({
+    String? name,
+    String? category,
+    int? capacity,
+    int? booked,
+    EquipmentStatus? status,
+    String? location,
+    IconData? imageIcon,
+    String? description,
+  }) {
+    return EquipmentItem(
+      id: id,
+      name: name ?? this.name,
+      category: category ?? this.category,
+      capacity: capacity ?? this.capacity,
+      booked: booked ?? this.booked,
+      status: status ?? this.status,
+      location: location ?? this.location,
+      imageIcon: imageIcon ?? this.imageIcon,
+      description: description ?? this.description,
+    );
+  }
 }
 
 class TrainerProfile {
@@ -221,6 +290,23 @@ class PaymentRecord {
   final PaymentStatus status;
   final DateTime createdAt;
   final String reference;
+
+  PaymentRecord copyWith({
+    String? method,
+    double? amount,
+    PaymentStatus? status,
+    DateTime? createdAt,
+    String? reference,
+  }) {
+    return PaymentRecord(
+      id: id,
+      method: method ?? this.method,
+      amount: amount ?? this.amount,
+      status: status ?? this.status,
+      createdAt: createdAt ?? this.createdAt,
+      reference: reference ?? this.reference,
+    );
+  }
 }
 
 class AppNotification {

@@ -13,7 +13,8 @@ class _AIRecommendationsPageState extends State<AIRecommendationsPage> {
     Recommendation(
       id: '1',
       title: 'Back Day Focused',
-      description: 'Your form has improved on pull-ups. Time to increase intensity.',
+      description:
+          'Your form has improved on pull-ups. Time to increase intensity.',
       reason: 'Based on your last 5 workouts',
       icon: '🎯',
       confidence: 92,
@@ -21,7 +22,8 @@ class _AIRecommendationsPageState extends State<AIRecommendationsPage> {
     Recommendation(
       id: '2',
       title: 'Rest & Recovery',
-      description: 'You\'ve worked hard lately. A light recovery session recommended.',
+      description:
+          'You\'ve worked hard lately. A light recovery session recommended.',
       reason: 'Pattern analysis shows overtraining',
       icon: '😴',
       confidence: 85,
@@ -92,26 +94,10 @@ class _StatsGrid extends StatelessWidget {
       crossAxisSpacing: 12,
       mainAxisSpacing: 12,
       children: [
-        _StatCard(
-          label: 'Consistency',
-          value: '92%',
-          icon: '📊',
-        ),
-        _StatCard(
-          label: 'Improvement',
-          value: '+18%',
-          icon: '📈',
-        ),
-        _StatCard(
-          label: 'Weekly Goal',
-          value: '4/5',
-          icon: '🎯',
-        ),
-        _StatCard(
-          label: 'AI Score',
-          value: '8.7/10',
-          icon: '⭐',
-        ),
+        _StatCard(label: 'Consistency', value: '92%', icon: '📊'),
+        _StatCard(label: 'Improvement', value: '+18%', icon: '📈'),
+        _StatCard(label: 'Weekly Goal', value: '4/5', icon: '🎯'),
+        _StatCard(label: 'AI Score', value: '8.7/10', icon: '⭐'),
       ],
     );
   }
@@ -136,16 +122,13 @@ class _StatCard extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text(
-              icon,
-              style: const TextStyle(fontSize: 24),
-            ),
+            Text(icon, style: const TextStyle(fontSize: 24)),
             const SizedBox(height: 8),
             Text(
               value,
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 4),
@@ -173,9 +156,9 @@ class _RecommendationCard extends StatelessWidget {
       child: InkWell(
         borderRadius: BorderRadius.circular(16),
         onTap: () {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Starting: ${rec.title}')),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('Starting: ${rec.title}')));
         },
         child: Padding(
           padding: const EdgeInsets.all(16),
@@ -184,10 +167,7 @@ class _RecommendationCard extends StatelessWidget {
             children: [
               Row(
                 children: [
-                  Text(
-                    rec.icon,
-                    style: const TextStyle(fontSize: 32),
-                  ),
+                  Text(rec.icon, style: const TextStyle(fontSize: 32)),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Column(

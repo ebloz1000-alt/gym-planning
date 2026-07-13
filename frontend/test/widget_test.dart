@@ -1,15 +1,16 @@
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gym_booking_app/main.dart';
-import 'package:gym_booking_app/providers_or_bloc/app_state.dart';
 
 void main() {
   testWidgets('boots into onboarding after splash checks', (
     WidgetTester tester,
   ) async {
-    await tester.pumpWidget(GymBookingApp(appState: AppState()));
+    await tester.pumpWidget(const ProviderScope(child: GymBookingApp()));
     await tester.pump(const Duration(seconds: 1));
     await tester.pumpAndSettle();
 
-    expect(find.text('Book equipment without guessing'), findsOneWidget);
+    expect(find.text('Premium training access'), findsAtLeastNWidgets(1));
+    expect(find.text('Next'), findsOneWidget);
   });
 }

@@ -93,23 +93,23 @@ class AdminDashboard extends StatelessWidget {
               AppButton(
                 label: 'Add Equipment',
                 icon: Icons.add_box_outlined,
-                onPressed: () {},
+                onPressed: () => _showEquipmentEditor(context),
               ),
               AppButton(
                 label: 'Assign Trainer',
                 icon: Icons.person_add_alt,
-                onPressed: () {},
+                onPressed: () => _showQuickTrainerAssignment(context),
               ),
               AppButton(
                 label: 'Export Report',
                 icon: Icons.download_outlined,
-                onPressed: () {},
+                onPressed: () => _exportDashboardReport(context),
               ),
               AppButton(
                 label: 'System Logs',
                 icon: Icons.article_outlined,
                 variant: AppButtonVariant.secondary,
-                onPressed: () {},
+                onPressed: () => _showSystemLogs(context),
               ),
             ],
           ),
@@ -119,6 +119,79 @@ class AdminDashboard extends StatelessWidget {
             .take(3)
             .map((booking) => BookingTile(booking: booking)),
       ],
+    );
+  }
+
+  void _showEquipmentEditor(BuildContext context) {
+    final state = AppScope.read(context);
+    final parentContext = context;
+    showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      isScrollControlled: true,
+      builder: (sheetContext) => _EquipmentEditorSheet(
+        onSave: (item) {
+          state.addEquipment(item);
+          Navigator.of(sheetContext).pop();
+          _showSnack(parentContext, '${item.name} added to inventory.');
+        },
+      ),
+    );
+  }
+
+  void _showQuickTrainerAssignment(BuildContext context) {
+    final state = AppScope.read(context);
+    final bookings = state.repository.bookings;
+    if (bookings.isEmpty) {
+      _showSnack(context, 'No bookings are available for trainer assignment.');
+      return;
+    }
+    final booking = bookings.firstWhere(
+      (item) => item.status != BookingStatus.cancelled,
+      orElse: () => bookings.first,
+    );
+    _showTrainerAssignmentSheet(context, state, booking);
+  }
+
+  void _exportDashboardReport(BuildContext context) {
+    final repo = AppScope.read(context).repository;
+    final readyRows = repo.reportRows
+        .where((row) => row.status.toLowerCase() == 'ready')
+        .length;
+    _showSnack(
+      context,
+      'Dashboard report exported with $readyRows ready sections.',
+    );
+  }
+
+  void _showSystemLogs(BuildContext context) {
+    final repo = AppScope.read(context).repository;
+    showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('System Logs'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Payments pending approval: ${repo.payments.where((item) => item.status == PaymentStatus.pending).length}',
+            ),
+            const SizedBox(height: 8),
+            Text('Bookings tracked: ${repo.bookings.length}'),
+            const SizedBox(height: 8),
+            Text('Equipment items: ${repo.equipment.length}'),
+            const SizedBox(height: 8),
+            Text('Last refresh: ${formatDate(DateTime.now())}'),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -208,17 +281,17 @@ class _AdminEquipmentManagementScreenState
                   spacing: 8,
                   children: [
                     OutlinedButton.icon(
-                      onPressed: () => _showEquipmentForm(context),
+                      onPressed: () => _showEquipmentForm(context, item: item),
                       icon: const Icon(Icons.edit_outlined),
                       label: const Text('Edit'),
                     ),
                     OutlinedButton.icon(
-                      onPressed: () {},
+                      onPressed: () => _markMaintenance(context, item),
                       icon: const Icon(Icons.construction_outlined),
                       label: const Text('Maintenance'),
                     ),
                     OutlinedButton.icon(
-                      onPressed: () {},
+                      onPressed: () => _deleteEquipment(context, item),
                       icon: const Icon(Icons.delete_outline),
                       label: const Text('Delete'),
                     ),
@@ -232,37 +305,44 @@ class _AdminEquipmentManagementScreenState
     );
   }
 
-  void _showEquipmentForm(BuildContext context) {
+  void _showEquipmentForm(BuildContext context, {EquipmentItem? item}) {
+    final state = AppScope.read(context);
+    final parentContext = context;
     showModalBottomSheet<void>(
       context: context,
       showDragHandle: true,
       isScrollControlled: true,
-      builder: (context) => Padding(
-        padding: EdgeInsets.fromLTRB(
-          16,
-          0,
-          16,
-          MediaQuery.of(context).viewInsets.bottom + 16,
-        ),
-        child: const Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(decoration: InputDecoration(labelText: 'Equipment name')),
-            SizedBox(height: 12),
-            TextField(decoration: InputDecoration(labelText: 'Category')),
-            SizedBox(height: 12),
-            TextField(decoration: InputDecoration(labelText: 'Capacity')),
-            SizedBox(height: 12),
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: Icon(Icons.image_outlined),
-              title: Text('Upload image'),
-              subtitle: Text('Frontend image picker placeholder'),
-            ),
-          ],
-        ),
+      builder: (sheetContext) => _EquipmentEditorSheet(
+        item: item,
+        onSave: (updated) {
+          if (item == null) {
+            state.addEquipment(updated);
+          } else {
+            state.updateEquipment(updated);
+          }
+          Navigator.of(sheetContext).pop();
+          _showSnack(
+            parentContext,
+            item == null
+                ? '${updated.name} added to inventory.'
+                : '${updated.name} updated.',
+          );
+        },
       ),
     );
+  }
+
+  void _markMaintenance(BuildContext context, EquipmentItem item) {
+    final nextStatus = item.status == EquipmentStatus.maintenance
+        ? EquipmentStatus.available
+        : EquipmentStatus.maintenance;
+    AppScope.read(context).updateEquipment(item.copyWith(status: nextStatus));
+    _showSnack(context, '${item.name} marked ${nextStatus.label}.');
+  }
+
+  void _deleteEquipment(BuildContext context, EquipmentItem item) {
+    AppScope.read(context).deleteEquipment(item);
+    _showSnack(context, '${item.name} removed from inventory.');
   }
 }
 
@@ -422,14 +502,19 @@ class _AdminBookingManagementScreenState
                   runSpacing: 8,
                   children: [
                     OutlinedButton.icon(
-                      onPressed: () {},
+                      onPressed: () {
+                        state.overrideBooking(booking);
+                        _showSnack(
+                          context,
+                          '${booking.equipmentName} override applied.',
+                        );
+                      },
                       icon: const Icon(Icons.sync_alt_outlined),
                       label: const Text('Override'),
                     ),
                     OutlinedButton.icon(
-                      onPressed: () => state.updateBooking(
-                        booking.copyWith(trainerName: 'Maya Wanjiku'),
-                      ),
+                      onPressed: () =>
+                          _showTrainerAssignmentSheet(context, state, booking),
                       icon: const Icon(Icons.person_add_alt),
                       label: const Text('Assign Trainer'),
                     ),
@@ -445,6 +530,209 @@ class _AdminBookingManagementScreenState
           ),
         ),
       ],
+    );
+  }
+}
+
+void _showTrainerAssignmentSheet(
+  BuildContext context,
+  AppState state,
+  Booking booking,
+) {
+  showModalBottomSheet<void>(
+    context: context,
+    showDragHandle: true,
+    builder: (sheetContext) => ListView(
+      shrinkWrap: true,
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+      children: [
+        Text(
+          'Assign trainer',
+          style: Theme.of(sheetContext).textTheme.titleMedium,
+        ),
+        const SizedBox(height: 8),
+        Text(
+          '${booking.equipmentName} at ${booking.timeSlot}',
+          style: Theme.of(sheetContext).textTheme.bodyMedium,
+        ),
+        const SizedBox(height: 12),
+        ...state.repository.trainers.map(
+          (trainer) => ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: AppAvatar(label: trainer.name.substring(0, 1)),
+            title: Text(trainer.name),
+            subtitle: Text('${trainer.specialty} - ${trainer.status}'),
+            trailing: booking.trainerName == trainer.name
+                ? const StatusBadge(label: 'Current', compact: true)
+                : null,
+            onTap: () {
+              state.updateBooking(booking.copyWith(trainerName: trainer.name));
+              Navigator.of(sheetContext).pop();
+              _showSnack(context, '${trainer.name} assigned to booking.');
+            },
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+void _showSnack(BuildContext context, String message) {
+  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+}
+
+class _EquipmentEditorSheet extends StatefulWidget {
+  const _EquipmentEditorSheet({required this.onSave, this.item});
+
+  final EquipmentItem? item;
+  final ValueChanged<EquipmentItem> onSave;
+
+  @override
+  State<_EquipmentEditorSheet> createState() => _EquipmentEditorSheetState();
+}
+
+class _EquipmentEditorSheetState extends State<_EquipmentEditorSheet> {
+  late final TextEditingController _name;
+  late final TextEditingController _category;
+  late final TextEditingController _capacity;
+  late final TextEditingController _location;
+  late final TextEditingController _description;
+  late EquipmentStatus _status;
+
+  @override
+  void initState() {
+    super.initState();
+    final item = widget.item;
+    _name = TextEditingController(text: item?.name ?? '');
+    _category = TextEditingController(text: item?.category ?? '');
+    _capacity = TextEditingController(text: '${item?.capacity ?? 1}');
+    _location = TextEditingController(text: item?.location ?? 'Main Floor');
+    _description = TextEditingController(text: item?.description ?? '');
+    _status = item?.status ?? EquipmentStatus.available;
+  }
+
+  @override
+  void dispose() {
+    _name.dispose();
+    _category.dispose();
+    _capacity.dispose();
+    _location.dispose();
+    _description.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        16,
+        0,
+        16,
+        MediaQuery.of(context).viewInsets.bottom + 16,
+      ),
+      child: ListView(
+        shrinkWrap: true,
+        children: [
+          Text(
+            widget.item == null ? 'Add equipment' : 'Edit equipment',
+            style: Theme.of(context).textTheme.titleMedium,
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _name,
+            decoration: const InputDecoration(labelText: 'Equipment name'),
+            textInputAction: TextInputAction.next,
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _category,
+            decoration: const InputDecoration(labelText: 'Category'),
+            textInputAction: TextInputAction.next,
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _capacity,
+            decoration: const InputDecoration(labelText: 'Capacity'),
+            keyboardType: TextInputType.number,
+            textInputAction: TextInputAction.next,
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _location,
+            decoration: const InputDecoration(labelText: 'Location'),
+            textInputAction: TextInputAction.next,
+          ),
+          const SizedBox(height: 12),
+          DropdownButtonFormField<EquipmentStatus>(
+            initialValue: _status,
+            decoration: const InputDecoration(labelText: 'Status'),
+            items: EquipmentStatus.values
+                .map(
+                  (status) => DropdownMenuItem(
+                    value: status,
+                    child: Text(status.label),
+                  ),
+                )
+                .toList(),
+            onChanged: (value) => setState(() {
+              if (value != null) _status = value;
+            }),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _description,
+            decoration: const InputDecoration(labelText: 'Description'),
+            maxLines: 2,
+          ),
+          const SizedBox(height: 12),
+          const ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: Icon(Icons.image_outlined),
+            title: Text('Upload image'),
+            subtitle: Text('Uses the default equipment icon in this prototype'),
+          ),
+          const SizedBox(height: 12),
+          AppButton(
+            label: widget.item == null ? 'Add Equipment' : 'Save Equipment',
+            icon: Icons.save_outlined,
+            expand: true,
+            onPressed: _save,
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _save() {
+    final name = _name.text.trim();
+    final category = _category.text.trim();
+    if (name.isEmpty || category.isEmpty) {
+      _showSnack(context, 'Enter an equipment name and category.');
+      return;
+    }
+    final capacity = int.tryParse(_capacity.text.trim());
+    if (capacity == null || capacity <= 0) {
+      _showSnack(context, 'Enter a valid capacity.');
+      return;
+    }
+    final currentBooked = widget.item?.booked ?? 0;
+    final booked = currentBooked > capacity ? capacity : currentBooked;
+    widget.onSave(
+      EquipmentItem(
+        id: widget.item?.id ?? 'eq-${DateTime.now().millisecondsSinceEpoch}',
+        name: name,
+        category: category,
+        capacity: capacity,
+        booked: booked,
+        status: _status,
+        location: _location.text.trim().isEmpty
+            ? 'Main Floor'
+            : _location.text.trim(),
+        imageIcon: widget.item?.imageIcon ?? Icons.fitness_center_outlined,
+        description: _description.text.trim().isEmpty
+            ? '$category equipment ready for member booking.'
+            : _description.text.trim(),
+      ),
     );
   }
 }

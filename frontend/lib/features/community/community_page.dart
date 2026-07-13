@@ -40,24 +40,9 @@ class _CommunityPageState extends State<CommunityPage> {
   ];
 
   final List<Member> topMembers = [
-    Member(
-      name: 'Alex Runner',
-      points: 4520,
-      avatar: '👨‍🦰',
-      streak: 45,
-    ),
-    Member(
-      name: 'Emma Strong',
-      points: 4120,
-      avatar: '👩‍🦱',
-      streak: 38,
-    ),
-    Member(
-      name: 'Mike Fitness',
-      points: 3890,
-      avatar: '👨‍🦱',
-      streak: 32,
-    ),
+    Member(name: 'Alex Runner', points: 4520, avatar: '👨‍🦰', streak: 45),
+    Member(name: 'Emma Strong', points: 4120, avatar: '👩‍🦱', streak: 38),
+    Member(name: 'Mike Fitness', points: 3890, avatar: '👨‍🦱', streak: 32),
   ];
 
   @override
@@ -70,10 +55,7 @@ class _CommunityPageState extends State<CommunityPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              'Community',
-              style: Theme.of(context).textTheme.displayMedium,
-            ),
+            Text('Community', style: Theme.of(context).textTheme.displayMedium),
             const SizedBox(height: 8),
             Text(
               'Join challenges and compete with friends',
@@ -81,10 +63,7 @@ class _CommunityPageState extends State<CommunityPage> {
             ),
             const SizedBox(height: 24),
             // Leaderboard Section
-            Text(
-              'Leaderboard',
-              style: Theme.of(context).textTheme.titleLarge,
-            ),
+            Text('Leaderboard', style: Theme.of(context).textTheme.titleLarge),
             const SizedBox(height: 16),
             ListView.builder(
               shrinkWrap: true,
@@ -118,18 +97,11 @@ class _LeaderboardTile extends StatelessWidget {
   final Member member;
   final int rank;
 
-  const _LeaderboardTile({
-    required this.member,
-    required this.rank,
-  });
+  const _LeaderboardTile({required this.member, required this.rank});
 
   @override
   Widget build(BuildContext context) {
-    final colors = [
-      Colors.amber[600],
-      Colors.grey[400],
-      Colors.orange[600],
-    ];
+    final colors = [Colors.amber[600], Colors.grey[400], Colors.orange[600]];
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
@@ -155,10 +127,7 @@ class _LeaderboardTile extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 16),
-            Text(
-              member.avatar,
-              style: const TextStyle(fontSize: 24),
-            ),
+            Text(member.avatar, style: const TextStyle(fontSize: 24)),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
@@ -178,9 +147,9 @@ class _LeaderboardTile extends StatelessWidget {
             Text(
               '${member.points}pts',
               style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    color: Theme.of(context).colorScheme.primary,
-                    fontWeight: FontWeight.w600,
-                  ),
+                color: Theme.of(context).colorScheme.primary,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ],
         ),
@@ -212,10 +181,7 @@ class _ChallengeCard extends StatelessWidget {
                     style: Theme.of(context).textTheme.titleLarge,
                   ),
                 ),
-                Text(
-                  challenge.reward,
-                  style: const TextStyle(fontSize: 20),
-                ),
+                Text(challenge.reward, style: const TextStyle(fontSize: 20)),
               ],
             ),
             const SizedBox(height: 8),

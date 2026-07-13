@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../features/admin/admin_dashboard.dart';
 import '../../features/analytics/analytics_screen.dart';
 import '../../features/auth/auth_screen.dart';
 import '../../features/booking/booking_screen.dart';
-import '../../features/dashboard/dashboard_page.dart';
-import '../../features/equipment/equipment_screen.dart';
 import '../../features/feedback/feedback_screen.dart';
 import '../../features/help/help_screen.dart';
 import '../../features/member/member_dashboard.dart';
@@ -23,15 +23,101 @@ import '../../providers_or_bloc/app_state.dart';
 import '../constants/app_constants.dart';
 import '../widgets/app_cards.dart';
 
-class AppRouter {
-  const AppRouter._();
+final appRouterProvider = Provider<GoRouter>((ref) {
+  final appState = ref.read(appStateProvider);
+  final router = GoRouter(
+    initialLocation: '/',
+    refreshListenable: appState,
+    redirect: (_, state) => _redirectFor(appState, state),
+    routes: [
+      GoRoute(
+        path: '/',
+        name: 'root',
+        pageBuilder: (context, state) =>
+            _premiumPage(state, const SplashScreen()),
+      ),
+      GoRoute(
+        path: '/splash',
+        name: 'splash',
+        pageBuilder: (context, state) =>
+            _premiumPage(state, const SplashScreen()),
+      ),
+      GoRoute(
+        path: '/onboarding',
+        name: 'onboarding',
+        pageBuilder: (context, state) =>
+            _premiumPage(state, const OnboardingScreen()),
+      ),
+      GoRoute(
+        path: '/auth',
+        name: 'auth',
+        pageBuilder: (context, state) =>
+            _premiumPage(state, const AuthScreen()),
+      ),
+      GoRoute(
+        path: '/app',
+        name: 'app',
+        pageBuilder: (context, state) {
+          final appState = AppScope.watch(context);
+          return _premiumPage(
+            state,
+            RoleShell(role: appState.currentRole ?? UserRole.member),
+          );
+        },
+      ),
+    ],
+    errorBuilder: (context, state) => Scaffold(
+      body: Center(
+        child: Text(
+          'We could not open that page.',
+          style: Theme.of(context).textTheme.titleMedium,
+        ),
+      ),
+    ),
+  );
 
-  static Widget resolve(AppState state) {
-    if (!state.isBootstrapped) return const SplashScreen();
-    if (!state.hasCompletedOnboarding) return const OnboardingScreen();
-    if (state.currentRole == null) return const AuthScreen();
-    return RoleShell(role: state.currentRole!);
-  }
+  ref.onDispose(router.dispose);
+  return router;
+});
+
+String? _redirectFor(AppState appState, GoRouterState state) {
+  final target = _targetPath(appState);
+  final current = state.uri.path;
+  if (current == target) return null;
+  return target;
+}
+
+String _targetPath(AppState state) {
+  if (!state.isBootstrapped) return '/splash';
+  if (!state.hasCompletedOnboarding) return '/onboarding';
+  if (state.currentRole == null) return '/auth';
+  return '/app';
+}
+
+Page<void> _premiumPage(GoRouterState state, Widget child) {
+  return CustomTransitionPage<void>(
+    key: state.pageKey,
+    child: child,
+    transitionDuration: const Duration(milliseconds: 360),
+    reverseTransitionDuration: const Duration(milliseconds: 260),
+    transitionsBuilder: (context, animation, secondaryAnimation, child) {
+      final curved = CurvedAnimation(
+        parent: animation,
+        curve: Curves.easeOutCubic,
+        reverseCurve: Curves.easeInCubic,
+      );
+      return FadeTransition(
+        opacity: curved,
+        child: SlideTransition(
+          position: Tween<Offset>(
+            begin: const Offset(0, 0.025),
+            end: Offset.zero,
+          ).animate(curved),
+          child: child,
+        ),
+      );
+    },
+  );
 }
 
 class RoleShell extends StatefulWidget {
@@ -45,23 +131,34 @@ class RoleShell extends StatefulWidget {
 
 class _RoleShellState extends State<RoleShell> {
   final _scaffoldKey = GlobalKey<ScaffoldState>();
-  int _index = 0;
+  int _primaryIndex = 0;
+  int? _drawerIndex;
 
   @override
   void didUpdateWidget(covariant RoleShell oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.role != widget.role) {
-      _index = 0;
+      _primaryIndex = 0;
+      _drawerIndex = null;
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final state = AppScope.watch(context);
-    final destinations = _destinations(widget.role);
-    if (_index >= destinations.length) _index = 0;
-    final selected = destinations[_index];
+    final config = _navigationFor(widget.role);
+    final primaryDestinations = config.primaryDestinations;
+    final drawerDestinations = config.drawerDestinations;
+    if (_primaryIndex >= primaryDestinations.length) _primaryIndex = 0;
+    if (_drawerIndex != null && _drawerIndex! >= drawerDestinations.length) {
+      _drawerIndex = null;
+    }
+
+    final selected = _drawerIndex == null
+        ? primaryDestinations[_primaryIndex]
+        : drawerDestinations[_drawerIndex!];
     final isWide = MediaQuery.sizeOf(context).width >= 900;
+
     return Scaffold(
       key: _scaffoldKey,
       appBar: AppBar(
@@ -72,26 +169,18 @@ class _RoleShellState extends State<RoleShell> {
             onPressed: state.refreshJwt,
             icon: const Icon(Icons.sync_outlined),
           ),
-          PopupMenuButton<UserRole>(
-            tooltip: 'Switch role',
-            icon: const Icon(Icons.manage_accounts_outlined),
-            onSelected: state.switchRole,
-            itemBuilder: (context) => UserRole.values
-                .map(
-                  (role) => PopupMenuItem(
-                    value: role,
-                    child: Text('Open ${role.label} App'),
-                  ),
-                )
-                .toList(),
+          IconButton(
+            tooltip: 'Logout',
+            onPressed: state.logout,
+            icon: const Icon(Icons.logout_outlined),
           ),
         ],
       ),
       drawer: _RoleDrawer(
-        selectedIndex: _index,
-        destinations: destinations,
+        selectedIndex: _drawerIndex,
+        destinations: drawerDestinations,
         onSelected: (value) {
-          setState(() => _index = value);
+          setState(() => _drawerIndex = value);
           Navigator.of(context).maybePop();
         },
       ),
@@ -99,15 +188,14 @@ class _RoleShellState extends State<RoleShell> {
           ? Row(
               children: [
                 NavigationRail(
-                  selectedIndex: _index,
+                  selectedIndex: _drawerIndex == null ? _primaryIndex : null,
                   extended: MediaQuery.sizeOf(context).width >= 1120,
                   scrollable: true,
                   labelType: MediaQuery.sizeOf(context).width >= 1120
                       ? NavigationRailLabelType.none
                       : NavigationRailLabelType.all,
-                  onDestinationSelected: (value) =>
-                      setState(() => _index = value),
-                  destinations: destinations
+                  onDestinationSelected: _selectPrimaryDestination,
+                  destinations: primaryDestinations
                       .map(
                         (item) => NavigationRailDestination(
                           icon: Icon(item.icon),
@@ -125,166 +213,221 @@ class _RoleShellState extends State<RoleShell> {
       bottomNavigationBar: isWide
           ? null
           : _BottomRoleNavigation(
-              destinations: destinations,
-              selectedIndex: _index,
-              onSelected: (value) {
-                if (value == 4 && destinations.length > 5) {
-                  _scaffoldKey.currentState?.openDrawer();
-                  return;
-                }
-                setState(() => _index = value);
-              },
+              destinations: primaryDestinations,
+              selectedIndex: _primaryIndex,
+              onSelected: _selectPrimaryDestination,
             ),
     );
   }
 
-  List<RoleDestination> _destinations(UserRole role) {
+  void _selectPrimaryDestination(int value) {
+    if (widget.role == UserRole.member &&
+        value == 1 &&
+        !AppScope.read(context).hasBookableMembership) {
+      _openMembership(showMessage: true);
+      return;
+    }
+    setState(() {
+      _primaryIndex = value;
+      _drawerIndex = null;
+    });
+  }
+
+  void _openMembership({bool showMessage = false}) {
+    _openDrawerDestination(0);
+    if (!showMessage) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Select or renew a membership plan before booking.'),
+      ),
+    );
+  }
+
+  void _openDrawerDestination(int index) {
+    setState(() {
+      _primaryIndex = 0;
+      _drawerIndex = index;
+    });
+  }
+
+  _RoleNavigationConfig _navigationFor(UserRole role) {
     switch (role) {
       case UserRole.member:
-        return [
-          RoleDestination('Home', Icons.home_outlined, const DashboardPage()),
-          RoleDestination(
-            'Booking',
-            Icons.event_available_outlined,
-            const BookingScreen(),
-          ),
-          RoleDestination(
-            'Equipment',
-            Icons.fitness_center_outlined,
-            const EquipmentScreen(),
-          ),
-          RoleDestination(
-            'Trainers',
-            Icons.sports_gymnastics_outlined,
-            const TrainerModuleScreen(),
-          ),
-          RoleDestination(
-            'Membership',
-            Icons.workspace_premium_outlined,
-            const MembershipScreen(),
-          ),
-          RoleDestination(
-            'Payments',
-            Icons.payments_outlined,
-            const PaymentScreen(),
-          ),
-          RoleDestination(
-            'Notifications',
-            Icons.notifications_none_outlined,
-            const NotificationsScreen(),
-          ),
-          RoleDestination(
-            'Feedback',
-            Icons.rate_review_outlined,
-            const FeedbackScreen(),
-          ),
-          RoleDestination(
-            'Profile',
-            Icons.person_outline,
-            const ProfileScreen(),
-          ),
-          RoleDestination(
-            'Settings',
-            Icons.settings_outlined,
-            const SettingsScreen(),
-          ),
-          RoleDestination('Help', Icons.help_outline, const HelpScreen()),
-        ];
+        return _RoleNavigationConfig(
+          primaryDestinations: [
+            RoleDestination(
+              'Dashboard',
+              Icons.home_outlined,
+              MemberDashboard(
+                onQuickBook: () => _selectPrimaryDestination(1),
+                onRenew: () => _openMembership(),
+                onFeedback: () => _openDrawerDestination(1),
+              ),
+              selectedIcon: Icons.home_rounded,
+            ),
+            RoleDestination(
+              'Book Session',
+              Icons.event_available_outlined,
+              BookingScreen(onOpenMembership: () => _openMembership()),
+              selectedIcon: Icons.event_available_rounded,
+            ),
+            RoleDestination(
+              'My Bookings',
+              Icons.list_alt_outlined,
+              MyBookingsScreen(),
+              selectedIcon: Icons.list_alt_rounded,
+            ),
+            RoleDestination(
+              'Notifications',
+              Icons.notifications_none_outlined,
+              NotificationsScreen(),
+              selectedIcon: Icons.notifications_rounded,
+            ),
+            RoleDestination(
+              'Profile',
+              Icons.person_outline,
+              ProfileScreen(),
+              selectedIcon: Icons.person_rounded,
+            ),
+          ],
+          drawerDestinations: [
+            RoleDestination(
+              'Membership',
+              Icons.workspace_premium_outlined,
+              MembershipScreen(),
+            ),
+            RoleDestination(
+              'Feedback',
+              Icons.rate_review_outlined,
+              FeedbackScreen(),
+            ),
+            RoleDestination(
+              'Settings',
+              Icons.settings_outlined,
+              SettingsScreen(),
+            ),
+            RoleDestination('Help', Icons.help_outline, HelpScreen()),
+          ],
+        );
       case UserRole.trainer:
-        return [
-          RoleDestination(
-            'Dashboard',
-            Icons.dashboard_outlined,
-            const TrainerModuleScreen(),
-          ),
-          RoleDestination(
-            'Bookings',
-            Icons.event_note_outlined,
-            const BookingScreen(),
-          ),
-          RoleDestination(
-            'Notifications',
-            Icons.notifications_none_outlined,
-            const NotificationsScreen(),
-          ),
-          RoleDestination(
-            'Feedback',
-            Icons.rate_review_outlined,
-            const FeedbackScreen(),
-          ),
-          RoleDestination(
-            'Payments',
-            Icons.payments_outlined,
-            const PaymentScreen(),
-          ),
-          RoleDestination(
-            'Profile',
-            Icons.person_outline,
-            const ProfileScreen(),
-          ),
-          RoleDestination(
-            'Settings',
-            Icons.settings_outlined,
-            const SettingsScreen(),
-          ),
-          RoleDestination('Help', Icons.help_outline, const HelpScreen()),
-        ];
+        return const _RoleNavigationConfig(
+          primaryDestinations: [
+            RoleDestination(
+              'Dashboard',
+              Icons.dashboard_outlined,
+              TrainerModuleScreen(),
+              selectedIcon: Icons.dashboard_rounded,
+            ),
+            RoleDestination(
+              'My Sessions',
+              Icons.event_note_outlined,
+              TrainerSessionsScreen(),
+              selectedIcon: Icons.event_note_rounded,
+            ),
+            RoleDestination(
+              'Schedule',
+              Icons.calendar_month_outlined,
+              TrainerScheduleScreen(),
+              selectedIcon: Icons.calendar_month_rounded,
+            ),
+            RoleDestination(
+              'Notifications',
+              Icons.notifications_none_outlined,
+              NotificationsScreen(),
+              selectedIcon: Icons.notifications_rounded,
+            ),
+            RoleDestination(
+              'Profile',
+              Icons.person_outline,
+              ProfileScreen(),
+              selectedIcon: Icons.person_rounded,
+            ),
+          ],
+          drawerDestinations: [
+            RoleDestination(
+              'Feedback',
+              Icons.rate_review_outlined,
+              FeedbackScreen(),
+            ),
+            RoleDestination(
+              'Settings',
+              Icons.settings_outlined,
+              SettingsScreen(),
+            ),
+            RoleDestination('Help', Icons.help_outline, HelpScreen()),
+          ],
+        );
       case UserRole.admin:
-        return [
-          RoleDestination(
-            'Dashboard',
-            Icons.dashboard_outlined,
-            const AdminDashboard(),
-          ),
-          RoleDestination(
-            'Equipment',
-            Icons.inventory_2_outlined,
-            const AdminEquipmentManagementScreen(),
-          ),
-          RoleDestination(
-            'Users',
-            Icons.groups_outlined,
-            const UserManagementScreen(),
-          ),
-          RoleDestination(
-            'Bookings',
-            Icons.event_note_outlined,
-            const AdminBookingManagementScreen(),
-          ),
-          RoleDestination(
-            'Reports',
-            Icons.summarize_outlined,
-            const ReportsScreen(),
-          ),
-          RoleDestination(
-            'Analytics',
-            Icons.insights_outlined,
-            const AnalyticsScreen(),
-          ),
-          RoleDestination(
-            'Payments',
-            Icons.payments_outlined,
-            const PaymentScreen(),
-          ),
-          RoleDestination(
-            'Notifications',
-            Icons.notifications_none_outlined,
-            const NotificationsScreen(),
-          ),
-          RoleDestination(
-            'Profile',
-            Icons.person_outline,
-            const ProfileScreen(),
-          ),
-          RoleDestination(
-            'Settings',
-            Icons.settings_outlined,
-            const SettingsScreen(),
-          ),
-          RoleDestination('Help', Icons.help_outline, const HelpScreen()),
-        ];
+        return const _RoleNavigationConfig(
+          primaryDestinations: [
+            RoleDestination(
+              'Dashboard',
+              Icons.dashboard_outlined,
+              AdminDashboard(),
+              selectedIcon: Icons.dashboard_rounded,
+            ),
+            RoleDestination(
+              'Users',
+              Icons.groups_outlined,
+              UserManagementScreen(),
+              selectedIcon: Icons.groups_rounded,
+            ),
+            RoleDestination(
+              'Bookings',
+              Icons.event_note_outlined,
+              AdminBookingManagementScreen(),
+              selectedIcon: Icons.event_note_rounded,
+            ),
+            RoleDestination(
+              'Reports',
+              Icons.summarize_outlined,
+              ReportsScreen(),
+              selectedIcon: Icons.summarize_rounded,
+            ),
+            RoleDestination(
+              'Notifications',
+              Icons.notifications_none_outlined,
+              NotificationsScreen(),
+              selectedIcon: Icons.notifications_rounded,
+            ),
+          ],
+          drawerDestinations: [
+            RoleDestination(
+              'Equipment',
+              Icons.inventory_2_outlined,
+              AdminEquipmentManagementScreen(),
+            ),
+            RoleDestination(
+              'Analytics',
+              Icons.insights_outlined,
+              AnalyticsScreen(),
+            ),
+            RoleDestination(
+              'Payments',
+              Icons.payments_outlined,
+              PaymentScreen(),
+            ),
+            RoleDestination('Profile', Icons.person_outline, ProfileScreen()),
+            RoleDestination(
+              'Settings',
+              Icons.settings_outlined,
+              SettingsScreen(),
+            ),
+            RoleDestination('Help', Icons.help_outline, HelpScreen()),
+          ],
+        );
     }
   }
+}
+
+class _RoleNavigationConfig {
+  const _RoleNavigationConfig({
+    required this.primaryDestinations,
+    required this.drawerDestinations,
+  });
+
+  final List<RoleDestination> primaryDestinations;
+  final List<RoleDestination> drawerDestinations;
 }
 
 class RoleDestination {
@@ -306,7 +449,7 @@ class _RoleDrawer extends StatelessWidget {
     required this.onSelected,
   });
 
-  final int selectedIndex;
+  final int? selectedIndex;
   final List<RoleDestination> destinations;
   final ValueChanged<int> onSelected;
 
@@ -379,21 +522,10 @@ class _BottomRoleNavigation extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final items = destinations.length > 5
-        ? [
-            ...destinations.take(4),
-            const RoleDestination(
-              'More',
-              Icons.menu_outlined,
-              SizedBox.shrink(),
-            ),
-          ]
-        : destinations;
-    final navIndex = selectedIndex < 4 ? selectedIndex : items.length - 1;
     return NavigationBar(
-      selectedIndex: navIndex,
+      selectedIndex: selectedIndex,
       onDestinationSelected: onSelected,
-      destinations: items
+      destinations: destinations
           .map(
             (item) => NavigationDestination(
               icon: Icon(item.icon),

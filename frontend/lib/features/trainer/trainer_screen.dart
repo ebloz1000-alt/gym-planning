@@ -63,26 +63,24 @@ class _TrainerDashboard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final state = AppScope.watch(context);
-    final bookings = state.repository.bookings.take(4).toList();
     return FeaturePage(
       title: 'Trainer Dashboard',
-      subtitle: 'Today sessions, weekly schedule, calendar, and availability.',
+      subtitle: 'Availability, profile, notifications, and reviews.',
       trailing: const StatusBadge(label: 'Available'),
       children: [
         ResponsiveGrid(
           children: const [
             StatCard(
-              label: 'Today sessions',
-              value: '5',
+              label: 'Today status',
+              value: 'Open',
               icon: Icons.today_outlined,
               change: 'Active',
             ),
             StatCard(
-              label: 'Weekly sessions',
-              value: '28',
+              label: 'Weekly slots',
+              value: '21',
               icon: Icons.calendar_month_outlined,
-              change: '+8%',
+              change: 'Planned',
             ),
             StatCard(
               label: 'Rating',
@@ -98,15 +96,13 @@ class _TrainerDashboard extends StatelessWidget {
             ),
           ],
         ),
-        const SectionHeader(title: 'Session calendar'),
+        const SectionHeader(title: 'Availability calendar'),
         DateChipPicker(
           selectedDate: selectedDate,
           onSelected: onDate,
           days: 14,
         ),
-        const SectionHeader(title: 'Assigned sessions'),
-        ...bookings.map((booking) => BookingTile(booking: booking)),
-        const SectionHeader(title: 'Edit tomorrow sessions'),
+        const SectionHeader(title: 'Edit availability'),
         AppCard(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -139,6 +135,130 @@ class _TrainerDashboard extends StatelessWidget {
               'Specialty, bio, availability, notifications, and reviews',
             ),
             trailing: Icon(Icons.chevron_right),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class TrainerSessionsScreen extends StatelessWidget {
+  const TrainerSessionsScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final state = AppScope.watch(context);
+    final sessions = state.repository.bookings;
+    final today = sessions.where((booking) {
+      return DateUtils.isSameDay(booking.date, DateTime.now());
+    }).toList();
+    final upcoming = sessions.where((booking) {
+      return booking.status != BookingStatus.completed &&
+          !DateUtils.isSameDay(booking.date, DateTime.now());
+    }).toList();
+
+    return FeaturePage(
+      title: 'My Sessions',
+      subtitle: 'Client sessions, equipment assignments, and status tracking.',
+      children: [
+        ResponsiveGrid(
+          children: [
+            StatCard(
+              label: 'Today',
+              value: '${today.length}',
+              icon: Icons.today_outlined,
+              change: today.isEmpty ? 'Open' : 'Booked',
+            ),
+            StatCard(
+              label: 'Upcoming',
+              value: '${upcoming.length}',
+              icon: Icons.event_note_outlined,
+              change: 'Planned',
+            ),
+            const StatCard(
+              label: 'Completion',
+              value: '92%',
+              icon: Icons.task_alt_outlined,
+              change: 'Strong',
+            ),
+            const StatCard(
+              label: 'Feedback',
+              value: '4.9',
+              icon: Icons.star_outline,
+              change: 'Elite',
+            ),
+          ],
+        ),
+        const SectionHeader(title: 'Today'),
+        if (today.isEmpty)
+          const AppCard(
+            child: ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: Icon(Icons.event_available_outlined),
+              title: Text('No sessions today'),
+              subtitle: Text('Your schedule is open for new bookings.'),
+            ),
+          )
+        else
+          ...today.map(
+            (booking) =>
+                BookingTile(booking: booking, showPaymentStatus: false),
+          ),
+        const SectionHeader(title: 'Upcoming'),
+        ...upcoming.map(
+          (booking) => BookingTile(booking: booking, showPaymentStatus: false),
+        ),
+      ],
+    );
+  }
+}
+
+class TrainerScheduleScreen extends StatefulWidget {
+  const TrainerScheduleScreen({super.key});
+
+  @override
+  State<TrainerScheduleScreen> createState() => _TrainerScheduleScreenState();
+}
+
+class _TrainerScheduleScreenState extends State<TrainerScheduleScreen> {
+  DateTime _selectedDate = DateTime.now().add(const Duration(days: 1));
+  String? _selectedSlot = '07:00';
+
+  @override
+  Widget build(BuildContext context) {
+    return FeaturePage(
+      title: 'Schedule',
+      subtitle: 'Manage availability for member session booking.',
+      trailing: const StatusBadge(label: 'Available'),
+      children: [
+        DateChipPicker(
+          selectedDate: _selectedDate,
+          onSelected: (date) => setState(() => _selectedDate = date),
+          days: 14,
+        ),
+        const SectionHeader(title: 'Availability slots'),
+        AppCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                formatDate(_selectedDate),
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+              const SizedBox(height: 12),
+              TimeSlotPicker(
+                selectedSlot: _selectedSlot,
+                onSelected: (value) => setState(() => _selectedSlot = value),
+                availableSlots: const ['07:00', '12:00', '18:00'],
+              ),
+              const SizedBox(height: 14),
+              AppButton(
+                label: 'Save Schedule',
+                icon: Icons.save_outlined,
+                expand: true,
+                onPressed: () {},
+              ),
+            ],
           ),
         ),
       ],

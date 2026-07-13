@@ -19,19 +19,25 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   @override
   Widget build(BuildContext context) {
     final state = AppScope.watch(context);
+    final role = state.currentRole;
+    final availableTypes = _availableTypesFor(role);
+    final effectiveFilter = availableTypes.contains(_filter) ? _filter : null;
     final notifications = state.repository.notifications.where((item) {
-      return _filter == null || item.type == _filter;
+      return availableTypes.contains(item.type) &&
+          (effectiveFilter == null || item.type == effectiveFilter);
     }).toList();
     return FeaturePage(
-      title: 'Notifications',
-      subtitle: 'Firebase-ready categorized notification center and settings.',
+      title: role == UserRole.trainer
+          ? 'Trainer Notifications'
+          : 'Notifications',
+      subtitle: _subtitleFor(role),
       children: [
         SwitchListTile(
           contentPadding: EdgeInsets.zero,
-          title: const Text('Push notifications'),
-          subtitle: const Text(
-            'Booking, membership, payment, trainer, and reminders',
+          title: Text(
+            role == UserRole.trainer ? 'Trainer alerts' : 'Push notifications',
           ),
+          subtitle: Text(_toggleCopyFor(role)),
           value: state.notificationsEnabled,
           onChanged: state.setNotificationsEnabled,
         ),
@@ -43,17 +49,17 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                 padding: const EdgeInsets.only(right: 8),
                 child: ChoiceChip(
                   label: const Text('All'),
-                  selected: _filter == null,
+                  selected: effectiveFilter == null,
                   onSelected: (_) => setState(() => _filter = null),
                 ),
               ),
-              ...NotificationType.values.map(
+              ...availableTypes.map(
                 (type) => Padding(
                   padding: const EdgeInsets.only(right: 8),
                   child: ChoiceChip(
                     avatar: Icon(type.icon, size: 18),
                     label: Text(type.label),
-                    selected: _filter == type,
+                    selected: effectiveFilter == type,
                     onSelected: (_) => setState(() => _filter = type),
                   ),
                 ),
@@ -62,6 +68,15 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
           ),
         ),
         const SectionHeader(title: 'Notification center'),
+        if (notifications.isEmpty)
+          const AppCard(
+            child: ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: Icon(Icons.notifications_off_outlined),
+              title: Text('No notifications for this role'),
+              subtitle: Text('New alerts will appear here when they arrive.'),
+            ),
+          ),
         ...notifications.map(
           (item) => Dismissible(
             key: ValueKey(item.id),
@@ -92,5 +107,30 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         ),
       ],
     );
+  }
+
+  List<NotificationType> _availableTypesFor(UserRole? role) {
+    if (role == UserRole.trainer) {
+      return const [
+        NotificationType.booking,
+        NotificationType.trainer,
+        NotificationType.reminder,
+      ];
+    }
+    return NotificationType.values;
+  }
+
+  String _subtitleFor(UserRole? role) {
+    if (role == UserRole.trainer) {
+      return 'Session changes, availability updates, member feedback, and reminders.';
+    }
+    return 'Firebase-ready categorized notification center and settings.';
+  }
+
+  String _toggleCopyFor(UserRole? role) {
+    if (role == UserRole.trainer) {
+      return 'Booking assignments, schedule changes, feedback, and reminders';
+    }
+    return 'Booking, membership, payment, trainer, and reminders';
   }
 }

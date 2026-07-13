@@ -15,7 +15,8 @@ class ResponsiveHelper {
   static bool isDesktop(BuildContext context) =>
       MediaQuery.of(context).size.width >= desktopBreakpoint;
 
-  static double getResponsiveWidth(BuildContext context, {
+  static double getResponsiveWidth(
+    BuildContext context, {
     required double mobile,
     double? tablet,
     double? desktop,

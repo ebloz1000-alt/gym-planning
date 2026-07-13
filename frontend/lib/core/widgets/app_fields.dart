@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 class AppTextField extends StatefulWidget {
   const AppTextField({
@@ -12,6 +13,14 @@ class AppTextField extends StatefulWidget {
     this.maxLines = 1,
     this.validator,
     this.onChanged,
+    this.onFieldSubmitted,
+    this.textInputAction,
+    this.autofillHints,
+    this.enabled = true,
+    this.autofocus = false,
+    this.inputFormatters,
+    this.suffix,
+    this.helperText,
   });
 
   final String label;
@@ -23,6 +32,14 @@ class AppTextField extends StatefulWidget {
   final int maxLines;
   final String? Function(String?)? validator;
   final ValueChanged<String>? onChanged;
+  final ValueChanged<String>? onFieldSubmitted;
+  final TextInputAction? textInputAction;
+  final Iterable<String>? autofillHints;
+  final bool enabled;
+  final bool autofocus;
+  final List<TextInputFormatter>? inputFormatters;
+  final Widget? suffix;
+  final String? helperText;
 
   @override
   State<AppTextField> createState() => _AppTextFieldState();
@@ -40,21 +57,30 @@ class _AppTextFieldState extends State<AppTextField> {
       maxLines: widget.obscure ? 1 : widget.maxLines,
       validator: widget.validator,
       onChanged: widget.onChanged,
+      onFieldSubmitted: widget.onFieldSubmitted,
+      textInputAction: widget.textInputAction,
+      autofillHints: widget.autofillHints,
+      enabled: widget.enabled,
+      autofocus: widget.autofocus,
+      inputFormatters: widget.inputFormatters,
       decoration: InputDecoration(
         labelText: widget.label,
         hintText: widget.hint,
+        helperText: widget.helperText,
         prefixIcon: widget.icon == null ? null : Icon(widget.icon),
-        suffixIcon: widget.obscure
-            ? IconButton(
-                tooltip: _hidden ? 'Show password' : 'Hide password',
-                icon: Icon(
-                  _hidden
-                      ? Icons.visibility_outlined
-                      : Icons.visibility_off_outlined,
-                ),
-                onPressed: () => setState(() => _hidden = !_hidden),
-              )
-            : null,
+        suffixIcon:
+            widget.suffix ??
+            (widget.obscure
+                ? IconButton(
+                    tooltip: _hidden ? 'Show password' : 'Hide password',
+                    icon: Icon(
+                      _hidden
+                          ? Icons.visibility_outlined
+                          : Icons.visibility_off_outlined,
+                    ),
+                    onPressed: () => setState(() => _hidden = !_hidden),
+                  )
+                : null),
       ),
     );
   }

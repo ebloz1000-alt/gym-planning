@@ -10,6 +10,7 @@ class AppButton extends StatelessWidget {
     this.icon,
     this.variant = AppButtonVariant.primary,
     this.expand = false,
+    this.isLoading = false,
   });
 
   final String label;
@@ -17,25 +18,32 @@ class AppButton extends StatelessWidget {
   final IconData? icon;
   final AppButtonVariant variant;
   final bool expand;
+  final bool isLoading;
 
   @override
   Widget build(BuildContext context) {
-    final child = _ButtonLabel(label: label, icon: icon);
+    final child = isLoading
+        ? const SizedBox.square(
+            dimension: 20,
+            child: CircularProgressIndicator(strokeWidth: 2.4),
+          )
+        : _ButtonLabel(label: label, icon: icon);
+    final effectivePressed = isLoading ? null : onPressed;
     final button = switch (variant) {
       AppButtonVariant.primary => FilledButton(
-        onPressed: onPressed,
+        onPressed: effectivePressed,
         child: child,
       ),
       AppButtonVariant.secondary => FilledButton.tonal(
-        onPressed: onPressed,
+        onPressed: effectivePressed,
         child: child,
       ),
       AppButtonVariant.outline => OutlinedButton(
-        onPressed: onPressed,
+        onPressed: effectivePressed,
         child: child,
       ),
       AppButtonVariant.danger => FilledButton(
-        onPressed: onPressed,
+        onPressed: effectivePressed,
         style: FilledButton.styleFrom(
           backgroundColor: Theme.of(context).colorScheme.error,
           foregroundColor: Theme.of(context).colorScheme.onError,

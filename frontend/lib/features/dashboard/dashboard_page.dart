@@ -1,139 +1,16 @@
 import 'package:flutter/material.dart';
-import '../workouts/workouts_page.dart';
-import '../community/community_page.dart';
-import '../ai_recommendations/ai_page.dart';
-import '../nutrition/nutrition_page.dart';
-import '../chat/chat_page.dart';
-import '../virtual_classes/virtual_classes_page.dart';
-import '../premium/premium_page.dart';
+
+import '../../core/utils/formatters.dart';
 import '../../core/utils/responsive_helper.dart';
+import '../../models/app_models.dart';
 import '../../providers_or_bloc/app_state.dart';
 
-class DashboardPage extends StatefulWidget {
+class DashboardPage extends StatelessWidget {
   const DashboardPage({super.key});
 
   @override
-  State<DashboardPage> createState() => _DashboardPageState();
-}
-
-class _DashboardPageState extends State<DashboardPage> {
-  int _selectedIndex = 0;
-
-  final List<DashboardTab> tabs = [
-    DashboardTab(
-      label: 'Home',
-      icon: Icons.home,
-      page: const HomePage(),
-    ),
-    DashboardTab(
-      label: 'Workouts',
-      icon: Icons.fitness_center,
-      page: const WorkoutsPage(),
-    ),
-    DashboardTab(
-      label: 'Community',
-      icon: Icons.people,
-      page: const CommunityPage(),
-    ),
-    DashboardTab(
-      label: 'AI Coach',
-      icon: Icons.smart_toy,
-      page: const AIRecommendationsPage(),
-    ),
-    DashboardTab(
-      label: 'Nutrition',
-      icon: Icons.restaurant,
-      page: const NutritionPage(),
-    ),
-    DashboardTab(
-      label: 'Classes',
-      icon: Icons.video_camera_back,
-      page: const VirtualClassesPage(),
-    ),
-    DashboardTab(
-      label: 'Chat',
-      icon: Icons.message,
-      page: const ChatPage(),
-    ),
-    DashboardTab(
-      label: 'Premium',
-      icon: Icons.star,
-      page: const PremiumPage(),
-    ),
-  ];
-
-  @override
   Widget build(BuildContext context) {
-    final isMobile = ResponsiveHelper.isMobile(context);
-    final isDesktop = ResponsiveHelper.isDesktop(context);
-
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('GymFlow Pro'),
-        centerTitle: true,
-        elevation: 0,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.notifications),
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Notifications')),
-              );
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.settings),
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Settings')),
-              );
-            },
-          ),
-          if (isDesktop) const SizedBox(width: 8),
-        ],
-      ),
-      body: Row(
-        children: [
-          // Sidebar for desktop
-          if (isDesktop)
-            SizedBox(
-              width: 280,
-              child: _SidebarNavigation(
-                tabs: tabs,
-                selectedIndex: _selectedIndex,
-                onTabChanged: (index) {
-                  setState(() => _selectedIndex = index);
-                },
-              ),
-            ),
-          // Main content
-          Expanded(
-            child: tabs[_selectedIndex].page,
-          ),
-        ],
-      ),
-      // Bottom navigation for mobile
-      bottomNavigationBar: isMobile
-          ? _BottomNavigation(
-              tabs: tabs,
-              selectedIndex: _selectedIndex,
-              onTabChanged: (index) {
-                setState(() => _selectedIndex = index);
-              },
-            )
-          : null,
-      // Navigation drawer for tablet
-      drawer: !isDesktop && !isMobile
-          ? _DrawerNavigation(
-              tabs: tabs,
-              selectedIndex: _selectedIndex,
-              onTabChanged: (index) {
-                Navigator.pop(context);
-                setState(() => _selectedIndex = index);
-              },
-            )
-          : null,
-    );
+    return const HomePage();
   }
 }
 
@@ -143,7 +20,13 @@ class HomePage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final padding = ResponsiveHelper.getResponsivePadding(context);
-    final appState = AppScope.watch(context);
+    final state = AppScope.watch(context);
+    final repo = state.repository;
+    final user = state.currentUser;
+    final nextBooking = repo.bookings.isEmpty ? null : repo.bookings.first;
+    final pendingPayments = repo.payments
+        .where((payment) => payment.status == PaymentStatus.pending)
+        .length;
 
     return SingleChildScrollView(
       child: Padding(
@@ -151,25 +34,31 @@ class HomePage extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Welcome Section
             Text(
-              'Welcome back! 👋',
-              style: Theme.of(context).textTheme.displayMedium,
+              'Welcome back${user == null ? '' : ', ${user.name}'}',
+              style: Theme.of(context).textTheme.headlineMedium,
             ),
             const SizedBox(height: 8),
             Text(
-              'Ready to crush your fitness goals?',
+              'Your gym access, bookings, payments, and alerts are ready.',
               style: Theme.of(context).textTheme.bodyLarge,
             ),
             const SizedBox(height: 24),
-            // Quick Stats
-            _QuickStats(),
-            const SizedBox(height: 32),
-            // Today's Workout
-            _TodayWorkout(),
-            const SizedBox(height: 32),
-            // Quick Actions
-            _QuickActions(),
+            _QuickStats(
+              bookingsCount: repo.bookings.length,
+              membership: repo.currentMembership,
+              pendingPayments: pendingPayments,
+              unreadNotifications: state.unreadNotifications,
+            ),
+            const SizedBox(height: 24),
+            _NextBookingCard(booking: nextBooking),
+            const SizedBox(height: 16),
+            _MembershipCard(membership: repo.currentMembership),
+            const SizedBox(height: 16),
+            _PaymentSummaryCard(
+              latestPayment: repo.payments.isEmpty ? null : repo.payments.first,
+              pendingPayments: pendingPayments,
+            ),
             const SizedBox(height: 32),
           ],
         ),
@@ -179,6 +68,18 @@ class HomePage extends StatelessWidget {
 }
 
 class _QuickStats extends StatelessWidget {
+  const _QuickStats({
+    required this.bookingsCount,
+    required this.membership,
+    required this.pendingPayments,
+    required this.unreadNotifications,
+  });
+
+  final int bookingsCount;
+  final MembershipRecord membership;
+  final int pendingPayments;
+  final int unreadNotifications;
+
   @override
   Widget build(BuildContext context) {
     final gridCount = ResponsiveHelper.isMobile(context) ? 2 : 4;
@@ -187,33 +88,33 @@ class _QuickStats extends StatelessWidget {
       crossAxisCount: gridCount,
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
-      childAspectRatio: 1.2,
+      childAspectRatio: 1.25,
       crossAxisSpacing: 12,
       mainAxisSpacing: 12,
       children: [
         _StatBox(
-          title: 'Streak',
-          value: '12 Days',
-          icon: '🔥',
-          color: Colors.red,
+          title: 'Bookings',
+          value: '$bookingsCount active',
+          icon: Icons.event_available_outlined,
+          color: Colors.teal,
         ),
         _StatBox(
-          title: 'Workouts',
-          value: '24 This Month',
-          icon: '💪',
-          color: Colors.blue,
+          title: 'Plan',
+          value: membership.plan,
+          icon: Icons.workspace_premium_outlined,
+          color: Colors.indigo,
         ),
         _StatBox(
-          title: 'Calories',
-          value: '2,450 kcal',
-          icon: '🔥',
+          title: 'Payments',
+          value: '$pendingPayments pending',
+          icon: Icons.payments_outlined,
           color: Colors.orange,
         ),
         _StatBox(
-          title: 'Level',
-          value: 'Elite',
-          icon: '⭐',
-          color: Colors.purple,
+          title: 'Alerts',
+          value: '$unreadNotifications unread',
+          icon: Icons.notifications_active_outlined,
+          color: Colors.red,
         ),
       ],
     );
@@ -221,17 +122,17 @@ class _QuickStats extends StatelessWidget {
 }
 
 class _StatBox extends StatelessWidget {
-  final String title;
-  final String value;
-  final String icon;
-  final Color color;
-
   const _StatBox({
     required this.title,
     required this.value,
     required this.icon,
     required this.color,
   });
+
+  final String title;
+  final String value;
+  final IconData icon;
+  final Color color;
 
   @override
   Widget build(BuildContext context) {
@@ -241,16 +142,13 @@ class _StatBox extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text(
-              icon,
-              style: const TextStyle(fontSize: 32),
-            ),
+            Icon(icon, color: color, size: 32),
             const SizedBox(height: 8),
             Text(
               value,
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 4),
@@ -266,311 +164,88 @@ class _StatBox extends StatelessWidget {
   }
 }
 
-class _TodayWorkout extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Today\'s Recommended Workout',
-          style: Theme.of(context).textTheme.titleLarge,
-        ),
-        const SizedBox(height: 12),
-        Card(
-          child: Padding(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      '💪',
-                      style: const TextStyle(fontSize: 48),
-                    ),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 4,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.orange,
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Text(
-                            'AI Recommended',
-                            style: TextStyle(
-                              color:
-                                  Theme.of(context).colorScheme.onPrimary,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: Text(
-                    'Upper Body Strength Building',
-                    style: Theme.of(context).textTheme.titleLarge,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    Chip(
-                      avatar: const Text('⏱️'),
-                      label: const Text('45 min'),
-                      backgroundColor:
-                          Theme.of(context).colorScheme.primaryContainer,
-                    ),
-                    const SizedBox(width: 8),
-                    Chip(
-                      avatar: const Text('🔥'),
-                      label: const Text('320 cal'),
-                      backgroundColor:
-                          Theme.of(context).colorScheme.secondaryContainer,
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                SizedBox(
-                  width: double.infinity,
-                  child: FilledButton(
-                    onPressed: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Workout started! 🎯'),
-                        ),
-                      );
-                    },
-                    child: const Text('Start Workout'),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
+class _NextBookingCard extends StatelessWidget {
+  const _NextBookingCard({required this.booking});
 
-class _QuickActions extends StatelessWidget {
+  final Booking? booking;
+
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Quick Actions',
-          style: Theme.of(context).textTheme.titleLarge,
-        ),
-        const SizedBox(height: 12),
-        Wrap(
-          spacing: 12,
-          runSpacing: 12,
+    final booking = this.booking;
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _ActionButton(
-              icon: Icons.message,
-              label: 'Message Trainer',
-              onTap: () {},
-            ),
-            _ActionButton(
-              icon: Icons.event,
-              label: 'Book Class',
-              onTap: () {},
-            ),
-            _ActionButton(
-              icon: Icons.restaurant,
-              label: 'Log Meal',
-              onTap: () {},
-            ),
-            _ActionButton(
-              icon: Icons.analytics,
-              label: 'View Stats',
-              onTap: () {},
-            ),
+            Text('Next booking', style: Theme.of(context).textTheme.titleLarge),
+            const SizedBox(height: 12),
+            if (booking == null)
+              const Text('No active booking yet.')
+            else
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.event_available_outlined),
+                title: Text(booking.equipmentName),
+                subtitle: Text(
+                  '${formatDate(booking.date)} at ${booking.timeSlot}\n'
+                  'Trainer: ${booking.trainerName}',
+                ),
+                isThreeLine: true,
+                trailing: Chip(label: Text(booking.status.label)),
+              ),
           ],
         ),
-      ],
+      ),
     );
   }
 }
 
-class _ActionButton extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final VoidCallback onTap;
+class _MembershipCard extends StatelessWidget {
+  const _MembershipCard({required this.membership});
 
-  const _ActionButton({
-    required this.icon,
-    required this.label,
-    required this.onTap,
-  });
+  final MembershipRecord membership;
 
   @override
   Widget build(BuildContext context) {
-    return OutlinedButton.icon(
-      onPressed: onTap,
-      icon: Icon(icon),
-      label: Text(label),
-    );
-  }
-}
-
-class _SidebarNavigation extends StatelessWidget {
-  final List<DashboardTab> tabs;
-  final int selectedIndex;
-  final Function(int) onTabChanged;
-
-  const _SidebarNavigation({
-    required this.tabs,
-    required this.selectedIndex,
-    required this.onTabChanged,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        border: Border(
-          right: BorderSide(
-            color: Theme.of(context).colorScheme.outlineVariant,
-          ),
+    return Card(
+      child: ListTile(
+        contentPadding: const EdgeInsets.all(18),
+        leading: const Icon(Icons.card_membership_outlined),
+        title: Text('${membership.plan} membership'),
+        subtitle: Text(
+          '${membership.status} until ${formatDate(membership.expiresAt)}',
         ),
+        trailing: const Icon(Icons.chevron_right),
       ),
-      child: ListView(
-        children: List.generate(
-          tabs.length,
-          (index) => _NavItem(
-            icon: tabs[index].icon,
-            label: tabs[index].label,
-            isSelected: selectedIndex == index,
-            onTap: () => onTabChanged(index),
-          ),
+    );
+  }
+}
+
+class _PaymentSummaryCard extends StatelessWidget {
+  const _PaymentSummaryCard({
+    required this.latestPayment,
+    required this.pendingPayments,
+  });
+
+  final PaymentRecord? latestPayment;
+  final int pendingPayments;
+
+  @override
+  Widget build(BuildContext context) {
+    final payment = latestPayment;
+    return Card(
+      child: ListTile(
+        contentPadding: const EdgeInsets.all(18),
+        leading: const Icon(Icons.receipt_long_outlined),
+        title: Text('$pendingPayments pending payment(s)'),
+        subtitle: Text(
+          payment == null
+              ? 'No payment history yet.'
+              : 'Last payment: ${payment.method} - ${formatMoney(payment.amount)}',
         ),
+        trailing: const Icon(Icons.chevron_right),
       ),
     );
   }
-}
-
-class _BottomNavigation extends StatelessWidget {
-  final List<DashboardTab> tabs;
-  final int selectedIndex;
-  final Function(int) onTabChanged;
-
-  const _BottomNavigation({
-    required this.tabs,
-    required this.selectedIndex,
-    required this.onTabChanged,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return BottomNavigationBar(
-      currentIndex: selectedIndex,
-      onTap: onTabChanged,
-      type: BottomNavigationBarType.shifting,
-      items: tabs.map((tab) {
-        return BottomNavigationBarItem(
-          icon: Icon(tab.icon),
-          label: tab.label,
-        );
-      }).toList(),
-    );
-  }
-}
-
-class _DrawerNavigation extends StatelessWidget {
-  final List<DashboardTab> tabs;
-  final int selectedIndex;
-  final Function(int) onTabChanged;
-
-  const _DrawerNavigation({
-    required this.tabs,
-    required this.selectedIndex,
-    required this.onTabChanged,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Drawer(
-      child: ListView(
-        children: [
-          DrawerHeader(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
-                  '🏋️',
-                  style: Theme.of(context).textTheme.displayMedium,
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'GymFlow Pro',
-                  style: Theme.of(context).textTheme.titleLarge,
-                ),
-              ],
-            ),
-          ),
-          ...List.generate(
-            tabs.length,
-            (index) => ListTile(
-              leading: Icon(tabs[index].icon),
-              title: Text(tabs[index].label),
-              selected: selectedIndex == index,
-              onTap: () => onTabChanged(index),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _NavItem extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final bool isSelected;
-  final VoidCallback onTap;
-
-  const _NavItem({
-    required this.icon,
-    required this.label,
-    required this.isSelected,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return ListTile(
-      leading: Icon(icon),
-      title: Text(label),
-      selected: isSelected,
-      selectedTileColor:
-          Theme.of(context).colorScheme.primaryContainer.withOpacity(0.5),
-      onTap: onTap,
-    );
-  }
-}
-
-class DashboardTab {
-  final String label;
-  final IconData icon;
-  final Widget page;
-
-  DashboardTab({
-    required this.label,
-    required this.icon,
-    required this.page,
-  });
 }

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/utils/formatters.dart';
 import '../../core/widgets/app_button.dart';
 import '../../core/widgets/app_cards.dart';
 import '../../core/widgets/app_charts.dart';
@@ -15,6 +16,7 @@ class ReportsScreen extends StatefulWidget {
 
 class _ReportsScreenState extends State<ReportsScreen> {
   String _range = 'Monthly';
+  final List<_ReportExport> _exports = [];
 
   @override
   Widget build(BuildContext context) {
@@ -43,18 +45,18 @@ class _ReportsScreenState extends State<ReportsScreen> {
               AppButton(
                 label: 'Export PDF',
                 icon: Icons.picture_as_pdf_outlined,
-                onPressed: () {},
+                onPressed: () => _exportReport('PDF'),
               ),
               AppButton(
                 label: 'Export Excel',
                 icon: Icons.table_chart_outlined,
-                onPressed: () {},
+                onPressed: () => _exportReport('Excel'),
               ),
               AppButton(
                 label: 'Preview',
                 icon: Icons.visibility_outlined,
                 variant: AppButtonVariant.secondary,
-                onPressed: () {},
+                onPressed: () => _showPreview(context),
               ),
             ],
           ),
@@ -72,16 +74,90 @@ class _ReportsScreenState extends State<ReportsScreen> {
           ),
         ),
         const SectionHeader(title: 'Download history'),
-        const AppCard(
-          child: ListTile(
-            contentPadding: EdgeInsets.zero,
-            leading: Icon(Icons.download_done_outlined),
-            title: Text('Monthly revenue report'),
-            subtitle: Text('PDF and Excel generated for admin review'),
-            trailing: StatusBadge(label: 'Ready', compact: true),
+        if (_exports.isEmpty)
+          const AppCard(
+            child: ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: Icon(Icons.download_done_outlined),
+              title: Text('Monthly revenue report'),
+              subtitle: Text('PDF and Excel generated for admin review'),
+              trailing: StatusBadge(label: 'Ready', compact: true),
+            ),
+          )
+        else
+          ..._exports.map(
+            (export) => AppCard(
+              child: ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: Icon(
+                  export.format == 'PDF'
+                      ? Icons.picture_as_pdf_outlined
+                      : Icons.table_chart_outlined,
+                ),
+                title: Text('${export.range} ${export.format} report'),
+                subtitle: Text(formatDate(export.createdAt)),
+                trailing: const StatusBadge(label: 'Ready', compact: true),
+              ),
+            ),
           ),
-        ),
       ],
     );
   }
+
+  void _exportReport(String format) {
+    setState(() {
+      _exports.insert(
+        0,
+        _ReportExport(format: format, range: _range, createdAt: DateTime.now()),
+      );
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('$_range report exported as $format.')),
+    );
+  }
+
+  void _showPreview(BuildContext context) {
+    final rows = AppScope.read(context).repository.reportRows;
+    showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('$_range report preview'),
+        content: SizedBox(
+          width: 420,
+          child: ListView(
+            shrinkWrap: true,
+            children: rows
+                .map(
+                  (row) => ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: const Icon(Icons.summarize_outlined),
+                    title: Text(row.title),
+                    subtitle: Text('${row.metric} - ${row.change}'),
+                    trailing: StatusBadge(label: row.status, compact: true),
+                  ),
+                )
+                .toList(),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ReportExport {
+  const _ReportExport({
+    required this.format,
+    required this.range,
+    required this.createdAt,
+  });
+
+  final String format;
+  final String range;
+  final DateTime createdAt;
 }

@@ -60,10 +60,7 @@ class _WorkoutsPageState extends State<WorkoutsPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              'Workouts',
-              style: Theme.of(context).textTheme.displayMedium,
-            ),
+            Text('Workouts', style: Theme.of(context).textTheme.displayMedium),
             const SizedBox(height: 8),
             Text(
               'Choose from our premium workout collection',
@@ -113,10 +110,7 @@ class _WorkoutCard extends StatelessWidget {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
-                    workout.image,
-                    style: const TextStyle(fontSize: 32),
-                  ),
+                  Text(workout.image, style: const TextStyle(fontSize: 32)),
                   if (workout.isActive)
                     Container(
                       padding: const EdgeInsets.symmetric(
@@ -130,8 +124,7 @@ class _WorkoutCard extends StatelessWidget {
                       child: Text(
                         'Popular',
                         style: TextStyle(
-                          color:
-                              Theme.of(context).colorScheme.onTertiary,
+                          color: Theme.of(context).colorScheme.onTertiary,
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
                         ),
@@ -149,14 +142,8 @@ class _WorkoutCard extends StatelessWidget {
               Wrap(
                 spacing: 8,
                 children: [
-                  _InfoChip(
-                    icon: '⏱️',
-                    label: '${workout.duration} min',
-                  ),
-                  _InfoChip(
-                    icon: '🔥',
-                    label: '${workout.calories} cal',
-                  ),
+                  _InfoChip(icon: '⏱️', label: '${workout.duration} min'),
+                  _InfoChip(icon: '🔥', label: '${workout.calories} cal'),
                 ],
               ),
             ],
@@ -177,12 +164,8 @@ class _InfoChip extends StatelessWidget {
   Widget build(BuildContext context) {
     return Chip(
       avatar: Text(icon),
-      label: Text(
-        label,
-        style: const TextStyle(fontSize: 12),
-      ),
-      backgroundColor:
-          Theme.of(context).colorScheme.primaryContainer,
+      label: Text(label, style: const TextStyle(fontSize: 12)),
+      backgroundColor: Theme.of(context).colorScheme.primaryContainer,
       side: BorderSide.none,
     );
   }

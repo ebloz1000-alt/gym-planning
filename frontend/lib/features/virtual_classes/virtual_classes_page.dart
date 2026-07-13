@@ -89,10 +89,7 @@ class _VirtualClassesPageState extends State<VirtualClassesPage> {
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
-                    colors: [
-                      Colors.red[400]!,
-                      Colors.red[600]!,
-                    ],
+                    colors: [Colors.red[400]!, Colors.red[600]!],
                   ),
                   borderRadius: BorderRadius.circular(16),
                 ),
@@ -155,10 +152,7 @@ class _ClassCard extends StatelessWidget {
   final VirtualClass vClass;
   final bool isLive;
 
-  const _ClassCard({
-    required this.vClass,
-    this.isLive = false,
-  });
+  const _ClassCard({required this.vClass, this.isLive = false});
 
   @override
   Widget build(BuildContext context) {
@@ -166,9 +160,9 @@ class _ClassCard extends StatelessWidget {
       child: InkWell(
         borderRadius: BorderRadius.circular(16),
         onTap: () {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Joining ${vClass.title}...')),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('Joining ${vClass.title}...')));
         },
         child: Stack(
           children: [
@@ -191,10 +185,7 @@ class _ClassCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
-                    vClass.icon,
-                    style: const TextStyle(fontSize: 32),
-                  ),
+                  Text(vClass.icon, style: const TextStyle(fontSize: 32)),
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -274,9 +265,9 @@ class _ClassListItem extends StatelessWidget {
           children: [
             Text(
               _formatTime(vClass.startTime),
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
+              style: Theme.of(
+                context,
+              ).textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600),
             ),
             const SizedBox(height: 4),
             Text(
@@ -286,9 +277,9 @@ class _ClassListItem extends StatelessWidget {
           ],
         ),
         onTap: () {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Reserved: ${vClass.title}')),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('Reserved: ${vClass.title}')));
         },
       ),
     );

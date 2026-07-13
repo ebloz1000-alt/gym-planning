@@ -103,9 +103,7 @@ class _NutritionPageState extends State<NutritionPage> {
                                   style: Theme.of(context)
                                       .textTheme
                                       .displaySmall
-                                      ?.copyWith(
-                                        fontWeight: FontWeight.bold,
-                                      ),
+                                      ?.copyWith(fontWeight: FontWeight.bold),
                                 ),
                                 Text(
                                   '/ 2500 cal',
@@ -210,23 +208,17 @@ class _MacroCard extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text(
-              icon,
-              style: const TextStyle(fontSize: 28),
-            ),
+            Text(icon, style: const TextStyle(fontSize: 28)),
             const SizedBox(height: 8),
             Text(
               '$value$unit',
               style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: color,
-                  ),
+                fontWeight: FontWeight.bold,
+                color: color,
+              ),
             ),
             const SizedBox(height: 4),
-            Text(
-              label,
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
+            Text(label, style: Theme.of(context).textTheme.bodySmall),
           ],
         ),
       ),
@@ -250,10 +242,7 @@ class _MealCard extends StatelessWidget {
           children: [
             Row(
               children: [
-                Text(
-                  meal.icon,
-                  style: const TextStyle(fontSize: 28),
-                ),
+                Text(meal.icon, style: const TextStyle(fontSize: 28)),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(

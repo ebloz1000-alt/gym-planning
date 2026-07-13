@@ -106,24 +106,21 @@ class _PremiumPageState extends State<PremiumPage> {
             padding: padding + const EdgeInsets.symmetric(vertical: 32),
             child: Column(
               children: [
-                Text(
-                  '✨',
-                  style: Theme.of(context).textTheme.displayLarge,
-                ),
+                Text('✨', style: Theme.of(context).textTheme.displayLarge),
                 const SizedBox(height: 16),
                 Text(
                   'Premium Membership',
                   style: Theme.of(context).textTheme.displayMedium?.copyWith(
-                        color: Theme.of(context).colorScheme.onPrimary,
-                      ),
+                    color: Theme.of(context).colorScheme.onPrimary,
+                  ),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 8),
                 Text(
                   'Unlock your full potential',
                   style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                        color: Theme.of(context).colorScheme.onPrimary,
-                      ),
+                    color: Theme.of(context).colorScheme.onPrimary,
+                  ),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 24),
@@ -139,8 +136,8 @@ class _PremiumPageState extends State<PremiumPage> {
                   child: Text(
                     'Free 7-Day Trial',
                     style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          color: Theme.of(context).colorScheme.primary,
-                        ),
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
                   ),
                 ),
               ],
@@ -226,10 +223,7 @@ class _PricingSectionState extends State<_PricingSection> {
             Text('Yearly'),
             const SizedBox(width: 8),
             Container(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 8,
-                vertical: 4,
-              ),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(
                 color: Theme.of(context).colorScheme.primary,
                 borderRadius: BorderRadius.circular(4),
@@ -358,22 +352,19 @@ class _PricingCard extends StatelessWidget {
               const SizedBox(height: 8),
               Text(
                 duration,
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
+                style: Theme.of(
+                  context,
+                ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
               ),
               const SizedBox(height: 8),
               Text(
                 price,
                 style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: Theme.of(context).colorScheme.primary,
-                    ),
+                  fontWeight: FontWeight.bold,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
               ),
-              Text(
-                description,
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
+              Text(description, style: Theme.of(context).textTheme.bodySmall),
             ],
           ),
         ),
@@ -395,16 +386,13 @@ class _FeatureCard extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text(
-              feature.icon,
-              style: const TextStyle(fontSize: 32),
-            ),
+            Text(feature.icon, style: const TextStyle(fontSize: 32)),
             const SizedBox(height: 8),
             Text(
               feature.title,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 4),
@@ -433,10 +421,7 @@ class _PremiumWorkoutCard extends StatelessWidget {
         padding: const EdgeInsets.all(16),
         child: Row(
           children: [
-            Text(
-              workout.image,
-              style: const TextStyle(fontSize: 40),
-            ),
+            Text(workout.image, style: const TextStyle(fontSize: 40)),
             const SizedBox(width: 16),
             Expanded(
               child: Column(
@@ -463,8 +448,7 @@ class _PremiumWorkoutCard extends StatelessWidget {
                           child: Text(
                             'NEW',
                             style: TextStyle(
-                              color:
-                                  Theme.of(context).colorScheme.onPrimary,
+                              color: Theme.of(context).colorScheme.onPrimary,
                               fontSize: 10,
                               fontWeight: FontWeight.bold,
                             ),
