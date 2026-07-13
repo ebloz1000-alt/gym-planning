@@ -1,0 +1,1 @@
+web: gunicorn fitflow_api.wsgi:application
