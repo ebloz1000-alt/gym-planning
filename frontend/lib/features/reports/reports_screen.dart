@@ -1,6 +1,12 @@
+
 import 'package:flutter/material.dart';
 
 import '../../core/utils/formatters.dart';
+import '../../core/utils/report_export.dart';
+import 'package:http/http.dart' as http;
+import 'dart:io';
+import 'package:path_provider/path_provider.dart';
+import 'package:open_file/open_file.dart';
 import '../../core/widgets/app_button.dart';
 import '../../core/widgets/app_cards.dart';
 import '../../core/widgets/app_charts.dart';
@@ -104,16 +110,39 @@ class _ReportsScreenState extends State<ReportsScreen> {
     );
   }
 
-  void _exportReport(String format) {
-    setState(() {
-      _exports.insert(
-        0,
-        _ReportExport(format: format, range: _range, createdAt: DateTime.now()),
-      );
-    });
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('$_range report exported as $format.')),
-    );
+  Future<void> _exportReport(String format) async {
+    final uri = Uri.parse('http://localhost:8000/api/exports/reports/?format=${format.toLowerCase()}&range=${Uri.encodeComponent(_range)}');
+    try {
+      final resp = await http.get(uri).timeout(const Duration(seconds: 15));
+      if (resp.statusCode != 200) {
+        final body = resp.body.isNotEmpty ? resp.body : 'status ${resp.statusCode}';
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Export failed: $body')));
+        return;
+      }
+
+      final docsDir = await getApplicationDocumentsDirectory();
+      final exportDir = Directory('${docsDir.path}/reports');
+      if (!await exportDir.exists()) await exportDir.create(recursive: true);
+
+      // derive extension from content-type
+      final contentType = resp.headers['content-type'] ?? '';
+      final extension = contentType.contains('pdf') ? 'pdf' : 'xlsx';
+      final timestamp = DateTime.now().toIso8601String().replaceAll(':', '-').replaceAll('.', '-');
+      final fileName = '${_range.toLowerCase()}_$timestamp.$extension';
+      final file = File('${exportDir.path}/$fileName');
+      await file.writeAsBytes(resp.bodyBytes);
+
+      if (!mounted) return;
+      await OpenFile.open(file.path);
+
+      setState(() {
+        _exports.insert(0, _ReportExport(format: format, range: _range, createdAt: DateTime.now()));
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$format export saved to ${file.path}')));
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Export failed: $e')));
+    }
   }
 
   void _showPreview(BuildContext context) {

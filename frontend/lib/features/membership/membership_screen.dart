@@ -7,6 +7,8 @@ import '../../core/widgets/app_fields.dart';
 import '../../core/widgets/status_badge.dart';
 import '../../models/app_models.dart';
 import '../../providers_or_bloc/app_state.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 
 class MembershipScreen extends StatefulWidget {
   const MembershipScreen({super.key});
@@ -202,7 +204,7 @@ class _MembershipScreenState extends State<MembershipScreen> {
                   const SizedBox(height: 14),
                   AppTextField(
                     label: 'M-Pesa Phone Number',
-                    hint: '+254 700 000 000',
+                    hint: '07XXXXXXXX',
                     controller: _mpesaPhone,
                     icon: Icons.phone_android_outlined,
                     keyboardType: TextInputType.phone,
@@ -289,6 +291,44 @@ class _MembershipScreenState extends State<MembershipScreen> {
     return plan.price * (_vipDuration / plan.durationDays);
   }
 
+  String _normalizeMpesaNumber(String input) {
+    var phone = (input ?? '').trim().replaceAll(RegExp(r'[\s-]'), '');
+    if (phone.startsWith('+')) phone = phone.substring(1);
+    if (phone.startsWith('0')) {
+      // convert 07xxxxxxxx -> 2547xxxxxxxx
+      phone = '254' + phone.substring(1);
+    } else if (phone.startsWith('7')) {
+      phone = '254' + phone;
+    }
+    return phone;
+  }
+
+  Future<String?> _sendStkPush(String phone, double amount, String planName, int durationDays) async {
+    final uri = Uri.parse('http://localhost:8000/api/mpesa/stk_push/');
+    try {
+      final normalized = _normalizeMpesaNumber(phone);
+      const accountReference = '0799657075';
+      final resp = await http.post(
+        uri,
+        headers: {"Content-Type": "application/json"},
+        body: json.encode({
+          "phone": normalized,
+          "amount": amount.toInt(),
+          "plan_name": planName,
+          "duration_days": durationDays,
+          "account_reference": accountReference,
+        }),
+      ).timeout(const Duration(seconds: 15));
+      final body = json.decode(resp.body);
+      if (resp.statusCode == 200 && body['success'] == true) {
+        return null;
+      }
+      return body['detail']?.toString() ?? 'STK push failed with status ${resp.statusCode}';
+    } catch (error) {
+      return 'STK push request failed: $error';
+    }
+  }
+
   void _selectPlan(String name) {
     setState(() {
       _selectedPlan = name;
@@ -316,8 +356,9 @@ class _MembershipScreenState extends State<MembershipScreen> {
 
   String? _validateMpesaPhone(String? value) {
     final phone = (value ?? '').trim().replaceAll(RegExp(r'[\s-]'), '');
-    final isValid = RegExp(r'^(\+254|254|0)\d{9}$').hasMatch(phone);
-    if (!isValid) return 'Enter a valid M-Pesa phone number.';
+      // Accept 07XXXXXXXX format (10 digits starting with 07)
+      final isValid = RegExp(r'^07\d{8}$').hasMatch(phone);
+    if (!isValid) return 'Enter a valid M-Pesa number starting with 07';
     return null;
   }
 
@@ -340,12 +381,21 @@ class _MembershipScreenState extends State<MembershipScreen> {
       state.submitCashMembershipPayment(plan: plan, amount: amount);
       await Future<void>.delayed(const Duration(milliseconds: 250));
     } else {
-      await state.renewMembership(
-        plan: plan,
-        durationDays: durationDays,
-        phone: _mpesaPhone.text.trim(),
-        amount: amount,
+      final error = await _sendStkPush(_mpesaPhone.text.trim(), amount, plan.name, durationDays);
+      if (error != null) {
+        if (!mounted) return;
+        setState(() => _isRenewing = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(error)),
+        );
+        return;
+      }
+      if (!mounted) return;
+      setState(() => _isRenewing = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('STK Push sent — enter your PIN on the phone.')),
       );
+      return;
     }
     if (!mounted) return;
     setState(() => _isRenewing = false);

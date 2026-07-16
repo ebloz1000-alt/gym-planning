@@ -22,3 +22,12 @@ services:
         sync: false
       - key: DARAJA_CONSUMER_SECRET
         sync: false
+      - key: DARAJA_PASSKEY
+        sync: false
+      - key: DARAJA_SHORTCODE
+        sync: false
+      - key: DARAJA_CALLBACK_URL
+        value: "https://<YOUR_RENDER_SERVICE>.onrender.com/api/mpesa/callback/"
+        sync: false
+      - key: DARAJA_ENV
+        sync: false

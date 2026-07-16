@@ -165,6 +165,49 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
+  TrainerProfile? get currentTrainerProfile =>
+      currentRole == UserRole.trainer && currentUser != null
+          ? repository.trainerProfileForUser(currentUser!)
+          : null;
+
+  bool saveTrainerAvailability({
+    required String trainerId,
+    required String slot,
+  }) {
+    final saved = repository.saveTrainerAvailability(
+      trainerId: trainerId,
+      slot: slot,
+    );
+    if (saved) notifyListeners();
+    return saved;
+  }
+
+  bool withdrawTrainerAvailability({
+    required String trainerId,
+    required String slot,
+  }) {
+    final withdrawn = repository.removeTrainerAvailability(
+      trainerId: trainerId,
+      slot: slot,
+    );
+    if (withdrawn) notifyListeners();
+    return withdrawn;
+  }
+
+  bool saveTrainerSchedule({
+    required String trainerId,
+    required DateTime date,
+    required String slot,
+  }) {
+    final saved = repository.saveTrainerSchedule(
+      trainerId: trainerId,
+      date: date,
+      slot: slot,
+    );
+    if (saved) notifyListeners();
+    return saved;
+  }
+
   void deleteEquipment(EquipmentItem item) {
     repository.deleteEquipment(item);
     notifyListeners();

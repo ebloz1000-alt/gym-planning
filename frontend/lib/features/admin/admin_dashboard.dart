@@ -1,12 +1,18 @@
 import 'package:flutter/material.dart';
 
 import '../../core/utils/formatters.dart';
+import '../../core/utils/report_export.dart';
 import '../../core/widgets/app_button.dart';
 import '../../core/widgets/app_cards.dart';
 import '../../core/widgets/app_charts.dart';
+import '../../core/widgets/state_views.dart';
 import '../../core/widgets/status_badge.dart';
 import '../../models/app_models.dart';
 import '../../providers_or_bloc/app_state.dart';
+import 'package:http/http.dart' as http;
+import 'dart:io';
+import 'package:path_provider/path_provider.dart';
+import 'package:open_file/open_file.dart';
 
 class AdminDashboard extends StatelessWidget {
   const AdminDashboard({super.key});
@@ -23,6 +29,7 @@ class AdminDashboard extends StatelessWidget {
     final pendingPayments = repo.payments
         .where((payment) => payment.status == PaymentStatus.pending)
         .length;
+    final hasAnyRecords = repo.users.isNotEmpty || repo.bookings.isNotEmpty || repo.payments.isNotEmpty || repo.equipment.isNotEmpty || repo.trainers.isNotEmpty;
     return FeaturePage(
       title: 'Admin Dashboard',
       subtitle:
@@ -36,17 +43,17 @@ class AdminDashboard extends StatelessWidget {
               icon: Icons.groups_outlined,
               change: 'Active',
             ),
-            const StatCard(
+            StatCard(
               label: 'Memberships',
-              value: '126',
+              value: '${repo.membershipHistory.length}',
               icon: Icons.workspace_premium_outlined,
-              change: '+16%',
+              change: repo.membershipHistory.isEmpty ? 'No records' : 'Tracked',
             ),
             StatCard(
               label: 'Revenue',
-              value: formatMoney(74200),
+              value: formatMoney(repo.payments.fold<double>(0, (sum, payment) => sum + payment.amount)),
               icon: Icons.payments_outlined,
-              change: '+12%',
+              change: repo.payments.isEmpty ? 'No payments' : 'Recorded',
             ),
             StatCard(
               label: 'Today bookings',
@@ -54,17 +61,17 @@ class AdminDashboard extends StatelessWidget {
               icon: Icons.event_note_outlined,
               change: 'Confirmed',
             ),
-            const StatCard(
+            StatCard(
               label: 'Equipment usage',
-              value: '74%',
+              value: repo.equipment.isEmpty ? '0%' : '${(repo.equipment.where((item) => item.status == EquipmentStatus.available).length / (repo.equipment.isEmpty ? 1 : repo.equipment.length) * 100).round()}%',
               icon: Icons.fitness_center_outlined,
-              change: 'Active',
+              change: repo.equipment.isEmpty ? 'No records' : 'Available',
             ),
-            const StatCard(
+            StatCard(
               label: 'Trainer score',
-              value: '4.8',
+              value: repo.trainers.isEmpty ? '0.0' : '${repo.trainers.map((t) => t.rating).fold(0.0, (a, b) => a + b) / repo.trainers.length}',
               icon: Icons.star_outline,
-              change: '+4%',
+              change: repo.trainers.isEmpty ? 'No records' : 'Average',
             ),
             StatCard(
               label: 'Pending payments',
@@ -80,10 +87,18 @@ class AdminDashboard extends StatelessWidget {
             ),
           ],
         ),
-        const SectionHeader(title: 'Revenue overview'),
-        AppCard(child: AppLineChart(points: repo.revenueTrend)),
-        const SectionHeader(title: 'Equipment usage'),
-        AppCard(child: AppBarChart(points: repo.equipmentUsage)),
+        if (!hasAnyRecords)
+          const EmptyStateView(
+            title: 'No admin data yet',
+            message: 'Revenue, equipment, trainer, and booking records will appear here once data exists.',
+            icon: Icons.dashboard_outlined,
+          )
+        else ...[
+          const SectionHeader(title: 'Revenue overview'),
+          AppCard(child: AppLineChart(points: repo.revenueTrend)),
+          const SectionHeader(title: 'Equipment usage'),
+          AppCard(child: AppBarChart(points: repo.equipmentUsage)),
+        ],
         const SectionHeader(title: 'Quick actions'),
         AppCard(
           child: Wrap(
@@ -101,9 +116,14 @@ class AdminDashboard extends StatelessWidget {
                 onPressed: () => _showQuickTrainerAssignment(context),
               ),
               AppButton(
-                label: 'Export Report',
-                icon: Icons.download_outlined,
-                onPressed: () => _exportDashboardReport(context),
+                label: 'Export PDF',
+                icon: Icons.picture_as_pdf_outlined,
+                onPressed: () => _exportDashboardReport(context, 'PDF'),
+              ),
+              AppButton(
+                label: 'Export Excel',
+                icon: Icons.table_chart_outlined,
+                onPressed: () => _exportDashboardReport(context, 'Excel'),
               ),
               AppButton(
                 label: 'System Logs',
@@ -115,9 +135,16 @@ class AdminDashboard extends StatelessWidget {
           ),
         ),
         const SectionHeader(title: 'Recent bookings'),
-        ...repo.bookings
-            .take(3)
-            .map((booking) => BookingTile(booking: booking)),
+        if (repo.bookings.isEmpty)
+          const EmptyStateView(
+            title: 'No bookings yet',
+            message: 'New bookings will show up here once members reserve sessions.',
+            icon: Icons.event_note_outlined,
+          )
+        else
+          ...repo.bookings
+              .take(3)
+              .map((booking) => BookingTile(booking: booking)),
       ],
     );
   }
@@ -153,15 +180,34 @@ class AdminDashboard extends StatelessWidget {
     _showTrainerAssignmentSheet(context, state, booking);
   }
 
-  void _exportDashboardReport(BuildContext context) {
+  Future<void> _exportDashboardReport(BuildContext context, String format) async {
     final repo = AppScope.read(context).repository;
     final readyRows = repo.reportRows
         .where((row) => row.status.toLowerCase() == 'ready')
         .length;
-    _showSnack(
-      context,
-      'Dashboard report exported with $readyRows ready sections.',
-    );
+    final uri = Uri.parse('http://localhost:8000/api/exports/reports/?format=${format.toLowerCase()}&range=Dashboard');
+    try {
+      final resp = await http.get(uri).timeout(const Duration(seconds: 15));
+      if (resp.statusCode != 200) {
+        _showSnack(context, 'Export failed: ${resp.body}');
+        return;
+      }
+      final docsDir = await getApplicationDocumentsDirectory();
+      final exportDir = Directory('${docsDir.path}/reports');
+      if (!await exportDir.exists()) await exportDir.create(recursive: true);
+      final extension = resp.headers['content-type']?.contains('pdf') == true ? 'pdf' : 'xlsx';
+      final timestamp = DateTime.now().toIso8601String().replaceAll(':', '-').replaceAll('.', '-');
+      final fileName = 'dashboard_$timestamp.$extension';
+      final file = File('${exportDir.path}/$fileName');
+      await file.writeAsBytes(resp.bodyBytes);
+      await OpenFile.open(file.path);
+      _showSnack(
+        context,
+        'Dashboard $format export saved with $readyRows ready sections.\n${file.path}',
+      );
+    } catch (e) {
+      _showSnack(context, 'Export failed: $e');
+    }
   }
 
   void _showSystemLogs(BuildContext context) {

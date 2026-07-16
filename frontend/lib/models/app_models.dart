@@ -236,6 +236,28 @@ class TrainerProfile {
   final List<String> availableSlots;
   final String bio;
   final String status;
+
+  TrainerProfile copyWith({
+    String? id,
+    String? name,
+    String? specialty,
+    double? rating,
+    int? sessionsToday,
+    List<String>? availableSlots,
+    String? bio,
+    String? status,
+  }) {
+    return TrainerProfile(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      specialty: specialty ?? this.specialty,
+      rating: rating ?? this.rating,
+      sessionsToday: sessionsToday ?? this.sessionsToday,
+      availableSlots: availableSlots ?? this.availableSlots,
+      bio: bio ?? this.bio,
+      status: status ?? this.status,
+    );
+  }
 }
 
 class Booking {

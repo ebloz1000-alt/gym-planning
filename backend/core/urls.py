@@ -13,6 +13,9 @@ from core.views import (
     ReportsAPIView,
     TrainerProfileViewSet,
     UserViewSet,
+    MpesaStkPushAPIView,
+    MpesaCallbackAPIView,
+    ExportReportAPIView,
 )
 
 
@@ -30,6 +33,10 @@ router.register("feedback", FeedbackEntryViewSet, basename="feedback")
 urlpatterns = [
     path("analytics/", AnalyticsAPIView.as_view(), name="analytics"),
     path("reports/", ReportsAPIView.as_view(), name="reports"),
+    path("mpesa/stk_push/", MpesaStkPushAPIView.as_view(), name="mpesa-stk-push"),
+    path("mpesa/callback/", MpesaCallbackAPIView.as_view(), name="mpesa-callback"),
+    path("exports/reports/", ExportReportAPIView.as_view(), name="exports-reports"),
+    path("exports/membership/", ExportReportAPIView.as_view(), name="exports-membership"),
 ]
 
 urlpatterns += router.urls

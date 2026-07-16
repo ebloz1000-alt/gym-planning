@@ -183,7 +183,7 @@ class MockRepository {
     ),
   ];
 
-  final List<TrainerProfile> trainers = const [
+  final List<TrainerProfile> trainers = [
     TrainerProfile(
       id: 'tr-1',
       name: 'Brian Kariuki',
@@ -216,6 +216,8 @@ class MockRepository {
       bio: 'Mobility screens, corrective exercise, and recovery planning.',
     ),
   ];
+
+  final Map<String, Map<String, List<String>>> _trainerSchedules = {};
 
   final List<Booking> _bookings = [
     Booking(
@@ -496,6 +498,81 @@ class MockRepository {
     final index = _equipment.indexWhere((existing) => existing.id == item.id);
     if (index != -1) {
       _equipment[index] = item;
+    }
+  }
+
+  void updateTrainer(TrainerProfile trainer) {
+    final index = trainers.indexWhere((item) => item.id == trainer.id);
+    if (index != -1) {
+      trainers[index] = trainer;
+    }
+  }
+
+  bool saveTrainerAvailability({
+    required String trainerId,
+    required String slot,
+  }) {
+    final index = trainers.indexWhere((trainer) => trainer.id == trainerId);
+    if (index == -1) return false;
+    final trainer = trainers[index];
+    if (trainer.availableSlots.contains(slot)) {
+      return false;
+    }
+    trainers[index] = trainer.copyWith(
+      availableSlots: [...trainer.availableSlots, slot],
+    );
+    return true;
+  }
+
+  bool removeTrainerAvailability({
+    required String trainerId,
+    required String slot,
+  }) {
+    final index = trainers.indexWhere((trainer) => trainer.id == trainerId);
+    if (index == -1) return false;
+    final trainer = trainers[index];
+    if (!trainer.availableSlots.contains(slot)) {
+      return false;
+    }
+    final updatedSlots = trainer.availableSlots.where((item) => item != slot).toList();
+    trainers[index] = trainer.copyWith(availableSlots: updatedSlots);
+    return true;
+  }
+
+  bool saveTrainerSchedule({
+    required String trainerId,
+    required DateTime date,
+    required String slot,
+  }) {
+    final availabilityUpdated = saveTrainerAvailability(
+      trainerId: trainerId,
+      slot: slot,
+    );
+    final dateKey = _dateKey(date);
+    final scheduleForTrainer = _trainerSchedules.putIfAbsent(trainerId, () => {});
+    final slots = scheduleForTrainer.putIfAbsent(dateKey, () => []);
+    final scheduleAdded = !slots.contains(slot);
+    if (scheduleAdded) {
+      slots.add(slot);
+    }
+    return scheduleAdded || availabilityUpdated;
+  }
+
+  List<String> trainerScheduleFor(String trainerId, DateTime date) {
+    final scheduleForTrainer = _trainerSchedules[trainerId];
+    if (scheduleForTrainer == null) return const [];
+    return List.unmodifiable(scheduleForTrainer[_dateKey(date)] ?? []);
+  }
+
+  String _dateKey(DateTime date) {
+    return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+  }
+
+  TrainerProfile? trainerProfileForUser(AppUser user) {
+    try {
+      return trainers.firstWhere((trainer) => trainer.name == user.name);
+    } catch (_) {
+      return null;
     }
   }
 
