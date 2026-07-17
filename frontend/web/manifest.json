@@ -1,13 +1,23 @@
 {
-    "name": "gym_booking_app",
-    "short_name": "gym_booking_app",
+    "name": "FitFlow",
+    "short_name": "FitFlow",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
     "theme_color": "#0175C2",
     "description": "A new Flutter project.",
     "orientation": "portrait-primary",
-    "prefer_related_applications": false,
+    "prefer_related_applications": true,
+    "related_applications": [
+        {
+            "platform": "play",
+            "id": "com.fitflow.app"
+        },
+        {
+            "platform": "itunes",
+            "id": "987654321"
+        }
+    ],
     "icons": [
         {
             "src": "icons/Icon-192.png",

@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_button.dart';
 import '../../core/widgets/app_fields.dart';
+import '../../core/widgets/install_app_button.dart';
 import '../../models/app_models.dart';
 import '../../providers_or_bloc/app_state.dart';
 import 'widgets/auth_components.dart';
@@ -147,7 +148,14 @@ class _AuthScreenState extends State<AuthScreen> {
                           child: Center(
                             child: SingleChildScrollView(
                               padding: const EdgeInsets.all(32),
-                              child: _authCard(state),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  _loginPageHeader(state),
+                                  const SizedBox(height: 18),
+                                  _authCard(state),
+                                ],
+                              ),
                             ),
                           ),
                         ),
@@ -174,6 +182,8 @@ class _AuthScreenState extends State<AuthScreen> {
                           ),
                         ),
                       ),
+                      const SizedBox(height: 18),
+                      _loginPageHeader(state),
                       const SizedBox(height: 18),
                       _authCard(state),
                     ],
@@ -213,6 +223,27 @@ class _AuthScreenState extends State<AuthScreen> {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _loginPageHeader(AppState state) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: const [
+            Text(
+              'Welcome to FitFlow Elite',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            SizedBox(height: 4),
+            Text('Install the app for faster access and offline support.'),
+          ],
+        ),
+        const InstallAppButton(),
+      ],
     );
   }
 

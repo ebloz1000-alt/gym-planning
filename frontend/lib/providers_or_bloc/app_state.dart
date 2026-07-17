@@ -3,13 +3,17 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/legacy.dart';
 
+import '../core/services/pwa_manager.dart';
 import '../models/app_models.dart';
 import '../repositories/mock_repository.dart';
 
 class AppState extends ChangeNotifier {
-  AppState();
+  AppState() {
+    pwaManager.onChange = notifyListeners;
+  }
 
   final MockRepository repository = MockRepository();
+  final PwaManager pwaManager = PwaManager();
   Timer? _payLaterSweepTimer;
 
   bool isBootstrapped = false;

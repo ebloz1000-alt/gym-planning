@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'core/routes/app_router.dart';
 import 'core/theme/app_theme.dart';
 import 'providers_or_bloc/app_state.dart';
+import 'core/widgets/install_button.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -27,6 +28,18 @@ class GymBookingApp extends ConsumerWidget {
         darkTheme: AppTheme.dark,
         themeMode: appState.themeMode,
         routerConfig: router,
+        builder: (context, child) {
+          return Stack(
+            children: [
+              if (child != null) child,
+              const Positioned(
+                bottom: 16,
+                right: 16,
+                child: InstallButton(),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
