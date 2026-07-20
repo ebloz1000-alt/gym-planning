@@ -36,3 +36,16 @@ services:
         sync: false
       - key: DARAJA_ENV
         sync: false
+  - type: web
+    name: fitflow-gym-frontend
+    env: static
+    rootDir: frontend
+    buildCommand: flutter build web --release
+    startCommand: ""
+    envVars:
+      - key: API_BASE_URL
+        value: "https://<YOUR_BACKEND_SERVICE>.onrender.com"
+        sync: false
+      - key: APP_NAME
+        value: "Gym Equipment & Trainer Booking Management Mobile Application"
+        sync: false

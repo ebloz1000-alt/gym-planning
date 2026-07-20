@@ -235,7 +235,7 @@ class _AuthScreenState extends State<AuthScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: const [
             Text(
-              'Welcome to FitFlow Elite',
+              'Welcome to Gym Equipment & Trainer Booking Management Mobile Application',
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
             SizedBox(height: 4),
@@ -581,9 +581,9 @@ class _AuthScreenState extends State<AuthScreen> {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: scheme.primary.withOpacity(.1),
+        color: scheme.primary.withValues(alpha: .1),
         borderRadius: BorderRadius.circular(brand.radiusMd),
-        border: Border.all(color: scheme.primary.withOpacity(.2)),
+        border: Border.all(color: scheme.primary.withValues(alpha: .2)),
       ),
       child: Row(
         children: [
@@ -610,13 +610,13 @@ class _AuthScreenState extends State<AuthScreen> {
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: isPortal
-            ? scheme.secondaryContainer.withOpacity(.42)
-            : scheme.primary.withOpacity(.1),
+            ? scheme.secondaryContainer.withValues(alpha: .42)
+            : scheme.primary.withValues(alpha: .1),
         borderRadius: BorderRadius.circular(brand.radiusMd),
         border: Border.all(
           color: isPortal
-              ? scheme.secondary.withOpacity(.24)
-              : scheme.primary.withOpacity(.2),
+              ? scheme.secondary.withValues(alpha: .24)
+              : scheme.primary.withValues(alpha: .2),
         ),
       ),
       child: Row(
@@ -1006,8 +1006,8 @@ class _WorkspaceCard extends StatelessWidget {
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
             color: selected
-                ? scheme.primary.withOpacity(.14)
-                : scheme.surface.withOpacity(.48),
+                ? scheme.primary.withValues(alpha: .14)
+                : scheme.surface.withValues(alpha: .48),
             borderRadius: BorderRadius.circular(brand.radiusMd),
             border: Border.all(
               color: selected ? scheme.primary : scheme.outlineVariant,
@@ -1111,7 +1111,7 @@ class _HeroSection extends StatelessWidget {
                           decoration: BoxDecoration(
                             color: page == i
                                 ? Colors.white
-                                : Colors.white.withOpacity(.38),
+                                : Colors.white.withValues(alpha: .38),
                             borderRadius: BorderRadius.circular(99),
                           ),
                         ),
@@ -1147,9 +1147,9 @@ class _HeroSlideView extends StatelessWidget {
           width: compact ? 52 : 66,
           height: compact ? 52 : 66,
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(.14),
+            color: Colors.white.withValues(alpha: .14),
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: Colors.white.withOpacity(.18)),
+            border: Border.all(color: Colors.white.withValues(alpha: .18)),
           ),
           child: Icon(slide.icon, color: Colors.white, size: compact ? 28 : 34),
         ),
@@ -1168,7 +1168,7 @@ class _HeroSlideView extends StatelessWidget {
           overflow: TextOverflow.ellipsis,
           style: Theme.of(
             context,
-          ).textTheme.bodyLarge?.copyWith(color: Colors.white.withOpacity(.82)),
+          ).textTheme.bodyLarge?.copyWith(color: Colors.white.withValues(alpha: .82)),
         ),
         SizedBox(height: compact ? 14 : 22),
         _MetricPill(value: slide.metric, label: slide.metricLabel),
@@ -1205,9 +1205,9 @@ class _HeroBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(.12),
+        color: Colors.white.withValues(alpha: .12),
         borderRadius: BorderRadius.circular(99),
-        border: Border.all(color: Colors.white.withOpacity(.16)),
+        border: Border.all(color: Colors.white.withValues(alpha: .16)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -1238,9 +1238,9 @@ class _MetricPill extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(.12),
+        color: Colors.white.withValues(alpha: .12),
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: Colors.white.withOpacity(.16)),
+        border: Border.all(color: Colors.white.withValues(alpha: .16)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -1256,7 +1256,7 @@ class _MetricPill extends StatelessWidget {
           Text(
             label,
             style: Theme.of(context).textTheme.labelMedium?.copyWith(
-              color: Colors.white.withOpacity(.78),
+              color: Colors.white.withValues(alpha: .78),
             ),
           ),
         ],

@@ -2,7 +2,6 @@
 import 'package:flutter/material.dart';
 
 import '../../core/utils/formatters.dart';
-import '../../core/utils/report_export.dart';
 import 'package:http/http.dart' as http;
 import 'dart:io';
 import 'package:path_provider/path_provider.dart';
@@ -111,7 +110,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
   }
 
   Future<void> _exportReport(String format) async {
-    final uri = Uri.parse('http://localhost:8000/api/exports/reports/?format=${format.toLowerCase()}&range=${Uri.encodeComponent(_range)}');
+    final uri = Uri.parse('${AppConstants.apiBaseUrl}/api/exports/reports/?format=${format.toLowerCase()}&range=${Uri.encodeComponent(_range)}');
     try {
       final resp = await http.get(uri).timeout(const Duration(seconds: 15));
       if (resp.statusCode != 200) {

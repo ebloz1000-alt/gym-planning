@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import '../../core/utils/formatters.dart';
-import '../../core/utils/report_export.dart';
 import '../../core/widgets/app_button.dart';
 import '../../core/widgets/app_cards.dart';
 import '../../core/widgets/app_charts.dart';
@@ -185,7 +184,7 @@ class AdminDashboard extends StatelessWidget {
     final readyRows = repo.reportRows
         .where((row) => row.status.toLowerCase() == 'ready')
         .length;
-    final uri = Uri.parse('http://localhost:8000/api/exports/reports/?format=${format.toLowerCase()}&range=Dashboard');
+    final uri = Uri.parse('${AppConstants.apiBaseUrl}/api/exports/reports/?format=${format.toLowerCase()}&range=Dashboard');
     try {
       final resp = await http.get(uri).timeout(const Duration(seconds: 15));
       if (resp.statusCode != 200) {

@@ -296,15 +296,15 @@ class _MembershipScreenState extends State<MembershipScreen> {
     if (phone.startsWith('+')) phone = phone.substring(1);
     if (phone.startsWith('0')) {
       // convert 07xxxxxxxx -> 2547xxxxxxxx
-      phone = '254' + phone.substring(1);
+      phone = '254${phone.substring(1)}';
     } else if (phone.startsWith('7')) {
-      phone = '254' + phone;
+      phone = '254$phone';
     }
     return phone;
   }
 
   Future<String?> _sendStkPush(String phone, double amount, String planName, int durationDays) async {
-    final uri = Uri.parse('http://localhost:8000/api/mpesa/stk_push/');
+    final uri = Uri.parse('${AppConstants.apiBaseUrl}/api/mpesa/stk_push/');
     try {
       final normalized = _normalizeMpesaNumber(phone);
       const accountReference = '0799657075';

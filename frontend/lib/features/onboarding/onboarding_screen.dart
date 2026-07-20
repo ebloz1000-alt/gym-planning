@@ -62,7 +62,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             end: Alignment.bottomCenter,
             colors: [
               scheme.surface,
-              scheme.primary.withOpacity(.08),
+              scheme.primary.withValues(alpha: .08),
               scheme.surface,
             ],
           ),
@@ -218,10 +218,10 @@ class _OnboardingHero extends StatelessWidget {
                         width: iconSize,
                         height: iconSize,
                         decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(.14),
+                          color: Colors.white.withValues(alpha: .14),
                           borderRadius: BorderRadius.circular(iconRadius),
                           border: Border.all(
-                            color: Colors.white.withOpacity(.16),
+                            color: Colors.white.withValues(alpha: .16),
                           ),
                         ),
                         child: Icon(
@@ -243,7 +243,7 @@ class _OnboardingHero extends StatelessWidget {
                         maxLines: compact ? 3 : null,
                         overflow: compact ? TextOverflow.ellipsis : null,
                         style: messageStyle?.copyWith(
-                          color: Colors.white.withOpacity(.82),
+                          color: Colors.white.withValues(alpha: .82),
                         ),
                       ),
                       SizedBox(height: compact ? 16 : 22),
@@ -267,7 +267,7 @@ class _OnboardingHero extends StatelessWidget {
                               decoration: BoxDecoration(
                                 color: page == i
                                     ? Colors.white
-                                    : Colors.white.withOpacity(.38),
+                                    : Colors.white.withValues(alpha: .38),
                                 borderRadius: BorderRadius.circular(99),
                               ),
                             ),
@@ -309,7 +309,7 @@ class _OnboardingControls extends StatelessWidget {
       decoration: BoxDecoration(
         color: scheme.surface,
         borderRadius: BorderRadius.circular(brand.radiusLg),
-        border: Border.all(color: scheme.outlineVariant.withOpacity(.7)),
+        border: Border.all(color: scheme.outlineVariant.withValues(alpha: .7)),
         boxShadow: brand.softShadow,
       ),
       child: Column(
@@ -318,7 +318,7 @@ class _OnboardingControls extends StatelessWidget {
         children: [
           if (!compact) const Spacer(),
           Text(
-            'FitFlow Elite',
+            'Gym Equipment & Trainer Booking Management Mobile Application',
             style: Theme.of(context).textTheme.labelLarge?.copyWith(
               color: scheme.primary,
               fontWeight: FontWeight.w900,
@@ -391,7 +391,7 @@ class _BrandLockup extends StatelessWidget {
         ),
         const SizedBox(width: 12),
         Text(
-          'FitFlow Elite',
+          'Gym Equipment & Trainer Booking Management Mobile Application',
           style: Theme.of(context).textTheme.titleLarge?.copyWith(
             color: scheme.onSurface,
             fontWeight: FontWeight.w900,
@@ -421,9 +421,9 @@ class _OnboardingMetric extends StatelessWidget {
         vertical: compact ? 10 : 14,
       ),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(.12),
+        color: Colors.white.withValues(alpha: .12),
         borderRadius: BorderRadius.circular(compact ? 14 : 18),
-        border: Border.all(color: Colors.white.withOpacity(.16)),
+        border: Border.all(color: Colors.white.withValues(alpha: .16)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -446,7 +446,7 @@ class _OnboardingMetric extends StatelessWidget {
               maxLines: compact ? 1 : null,
               overflow: compact ? TextOverflow.ellipsis : null,
               style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                color: Colors.white.withOpacity(.78),
+                color: Colors.white.withValues(alpha: .78),
               ),
             ),
           ),

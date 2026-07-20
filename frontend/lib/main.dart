@@ -22,7 +22,7 @@ class GymBookingApp extends ConsumerWidget {
     return AppScope(
       state: appState,
       child: MaterialApp.router(
-        title: 'FitFlow Elite',
+        title: 'Gym Equipment & Trainer Booking Management Mobile Application',
         debugShowCheckedModeBanner: false,
         theme: AppTheme.light,
         darkTheme: AppTheme.dark,
@@ -31,7 +31,7 @@ class GymBookingApp extends ConsumerWidget {
         builder: (context, child) {
           return Stack(
             children: [
-              if (child != null) child,
+              ?child,
               const Positioned(
                 bottom: 16,
                 right: 16,

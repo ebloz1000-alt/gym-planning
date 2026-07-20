@@ -6,7 +6,6 @@ import '../../core/widgets/app_cards.dart';
 import '../../core/widgets/status_badge.dart';
 import '../../models/app_models.dart';
 import '../../providers_or_bloc/app_state.dart';
-import '../../core/utils/report_export.dart';
 import 'package:http/http.dart' as http;
 import 'dart:io';
 import 'package:path_provider/path_provider.dart';
@@ -123,6 +122,11 @@ class MemberDashboard extends StatelessWidget {
                 ),
                 const SizedBox(height: 10),
                 Text('Expires on ${formatDate(membership.expiresAt)}'),
+                const SizedBox(height: 6),
+                Text(
+                  '${membership.daysRemaining} days left • ${formatTimeLeft(membership.expiresAt)}',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
                 const SizedBox(height: 10),
                 LinearProgressIndicator(
                   value: 0.64,
@@ -138,16 +142,6 @@ class MemberDashboard extends StatelessWidget {
                       label: 'Quick Book',
                       icon: Icons.event_available_outlined,
                       onPressed: () => _handleQuickBook(context, state),
-                    ),
-                    AppButton(
-                      label: 'Export PDF',
-                      icon: Icons.picture_as_pdf_outlined,
-                      onPressed: () => _exportMembership(context, 'PDF', membership),
-                    ),
-                    AppButton(
-                      label: 'Export Excel',
-                      icon: Icons.table_chart_outlined,
-                      onPressed: () => _exportMembership(context, 'Excel', membership),
                     ),
                     AppButton(
                       label: 'Renew',
@@ -219,7 +213,7 @@ class MemberDashboard extends StatelessWidget {
       return;
     }
 
-    final uri = Uri.parse('http://localhost:8000/api/exports/membership/?format=${format.toLowerCase()}');
+    final uri = Uri.parse('${AppConstants.apiBaseUrl}/api/exports/membership/?format=${format.toLowerCase()}');
     try {
       final resp = await http.get(uri).timeout(const Duration(seconds: 15));
       if (resp.statusCode != 200) {

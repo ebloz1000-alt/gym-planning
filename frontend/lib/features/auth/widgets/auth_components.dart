@@ -37,7 +37,7 @@ class _AnimatedBrandMarkState extends State<AnimatedBrandMark>
     final brand = FitnessBrandTheme.of(context);
     final scheme = Theme.of(context).colorScheme;
     return Semantics(
-      label: 'FitFlow Elite brand',
+      label: 'Gym Equipment & Trainer Booking Management Mobile Application brand',
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -75,7 +75,7 @@ class _AnimatedBrandMarkState extends State<AnimatedBrandMark>
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  'FitFlow',
+                  'Gym Equipment & Trainer',
                   style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                     color: scheme.onSurface,
                     fontWeight: FontWeight.w900,
@@ -120,8 +120,8 @@ class PremiumAuthCard extends StatelessWidget {
             borderRadius: BorderRadius.circular(brand.radiusLg),
             border: Border.all(
               color: isDark
-                  ? Colors.white.withOpacity(.08)
-                  : Colors.black.withOpacity(.06),
+                  ? Colors.white.withValues(alpha: .08)
+                  : Colors.black.withValues(alpha: .06),
             ),
             boxShadow: brand.premiumShadow,
           ),
@@ -165,8 +165,8 @@ class AuthModeSegment extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
           decoration: BoxDecoration(
             color: selected
-                ? scheme.primary.withOpacity(.14)
-                : scheme.surface.withOpacity(.38),
+                ? scheme.primary.withValues(alpha: .14)
+                : scheme.surface.withValues(alpha: .38),
             borderRadius: BorderRadius.circular(brand.radiusMd),
             border: Border.all(
               color: selected ? scheme.primary : scheme.outlineVariant,
@@ -301,7 +301,7 @@ class PasswordStrengthMeter extends StatelessWidget {
             child: LinearProgressIndicator(
               minHeight: 7,
               value: details.score / 4,
-              backgroundColor: scheme.outlineVariant.withOpacity(.55),
+              backgroundColor: scheme.outlineVariant.withValues(alpha: .55),
               valueColor: AlwaysStoppedAnimation<Color>(color),
             ),
           ),
@@ -425,7 +425,7 @@ class LoadingOverlay extends StatelessWidget {
         opacity: visible ? 1 : 0,
         duration: const Duration(milliseconds: 180),
         child: ColoredBox(
-          color: Colors.black.withOpacity(.46),
+          color: Colors.black.withValues(alpha: .46),
           child: Center(
             child: Container(
               width: 230,
