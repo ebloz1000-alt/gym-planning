@@ -30,71 +30,80 @@ class _SplashScreenState extends State<SplashScreen> {
     final scheme = Theme.of(context).colorScheme;
     return Scaffold(
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Spacer(),
-              Container(
-                width: 76,
-                height: 76,
-                decoration: BoxDecoration(
-                  color: scheme.primaryContainer,
-                  borderRadius: BorderRadius.circular(20),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            return SingleChildScrollView(
+              padding: const EdgeInsets.all(24),
+              child: ConstrainedBox(
+                constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                child: IntrinsicHeight(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const SizedBox(height: 16),
+                      Container(
+                        width: 76,
+                        height: 76,
+                        decoration: BoxDecoration(
+                          color: scheme.primaryContainer,
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Icon(
+                          Icons.fitness_center_outlined,
+                          color: scheme.onPrimaryContainer,
+                          size: 40,
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      Text(
+                        AppConstants.appName,
+                        style: Theme.of(context).textTheme.displaySmall?.copyWith(
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Equipment and trainer booking for members, trainers, and admins.',
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          color: scheme.onSurfaceVariant,
+                        ),
+                      ),
+                      const SizedBox(height: 32),
+                      _SplashCheck(
+                        icon: Icons.wifi_tethering_outlined,
+                        label: 'Internet connection',
+                        value: state.hasInternet ? 'Connected' : 'Offline',
+                      ),
+                      _SplashCheck(
+                        icon: Icons.verified_outlined,
+                        label: 'App version',
+                        value: state.appVersionStatus,
+                      ),
+                      _SplashCheck(
+                        icon: Icons.key_outlined,
+                        label: 'JWT validation',
+                        value: state.jwtStatus,
+                      ),
+                      _SplashCheck(
+                        icon: Icons.manage_accounts_outlined,
+                        label: 'Role detection',
+                        value: state.currentRole?.label ?? 'Waiting for login',
+                      ),
+                      const SizedBox(height: 24),
+                      const LoadingStateView(message: 'Preparing your workspace'),
+                      const SizedBox(height: 16),
+                      Center(
+                        child: Text(
+                          'Version ${AppConstants.appVersion}',
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-                child: Icon(
-                  Icons.fitness_center_outlined,
-                  color: scheme.onPrimaryContainer,
-                  size: 40,
-                ),
               ),
-              const SizedBox(height: 24),
-              Text(
-                AppConstants.appName,
-                style: Theme.of(
-                  context,
-                ).textTheme.displaySmall?.copyWith(fontWeight: FontWeight.w800),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Equipment and trainer booking for members, trainers, and admins.',
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  color: scheme.onSurfaceVariant,
-                ),
-              ),
-              const SizedBox(height: 32),
-              _SplashCheck(
-                icon: Icons.wifi_tethering_outlined,
-                label: 'Internet connection',
-                value: state.hasInternet ? 'Connected' : 'Offline',
-              ),
-              _SplashCheck(
-                icon: Icons.verified_outlined,
-                label: 'App version',
-                value: state.appVersionStatus,
-              ),
-              _SplashCheck(
-                icon: Icons.key_outlined,
-                label: 'JWT validation',
-                value: state.jwtStatus,
-              ),
-              _SplashCheck(
-                icon: Icons.manage_accounts_outlined,
-                label: 'Role detection',
-                value: state.currentRole?.label ?? 'Waiting for login',
-              ),
-              const Spacer(),
-              const LoadingStateView(message: 'Preparing your workspace'),
-              const SizedBox(height: 16),
-              Center(
-                child: Text(
-                  'Version ${AppConstants.appVersion}',
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-              ),
-            ],
-          ),
+            );
+          },
         ),
       ),
     );

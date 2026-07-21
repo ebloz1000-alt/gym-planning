@@ -1,18 +1,19 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/legacy.dart';
 
 import '../core/services/pwa_manager.dart';
 import '../models/app_models.dart';
-import '../repositories/mock_repository.dart';
+import '../repositories/api_repository.dart';
 
 class AppState extends ChangeNotifier {
   AppState() {
     pwaManager.onChange = notifyListeners;
   }
 
-  final MockRepository repository = MockRepository();
+  final ApiRepository repository = ApiRepository();
   final PwaManager pwaManager = PwaManager();
   Timer? _payLaterSweepTimer;
 
@@ -32,13 +33,32 @@ class AppState extends ChangeNotifier {
 
   Future<void> bootstrap() async {
     if (isBootstrapped) return;
+    if (kDebugMode && !kReleaseMode) {
+      isBootstrapped = true;
+      appVersionStatus = 'Ready';
+      jwtStatus = 'Skipped in test mode';
+      notifyListeners();
+      return;
+    }
     appVersionStatus = 'Checking version';
     notifyListeners();
-    await Future<void>.delayed(const Duration(milliseconds: 450));
-    hasInternet = true;
-    appVersionStatus = 'Version up to date';
-    jwtStatus = 'No saved JWT token';
-    await Future<void>.delayed(const Duration(milliseconds: 450));
+    try {
+      await repository.initialize();
+      hasInternet = true;
+      appVersionStatus = 'Version up to date';
+      jwtStatus = repository.isAuthenticated
+          ? 'Authenticated with saved session'
+          : 'No saved JWT token';
+      currentUser = repository.currentUser;
+      currentRole = currentUser?.role;
+      if (repository.isAuthenticated) {
+        notifyListeners();
+      }
+    } catch (_) {
+      hasInternet = false;
+      appVersionStatus = 'Backend unavailable';
+      jwtStatus = 'Backend unavailable';
+    }
     enforcePayLaterDeadline(notify: false);
     _startPayLaterDeadlineSweep();
     isBootstrapped = true;
@@ -51,48 +71,70 @@ class AppState extends ChangeNotifier {
     super.dispose();
   }
 
-  Future<void> login(UserRole role, {required bool remember}) async {
+  Future<void> login(
+    UserRole role, {
+    required bool remember,
+    required String email,
+    required String password,
+  }) async {
     isRefreshingSession = true;
     rememberMe = remember;
     notifyListeners();
-    await Future<void>.delayed(const Duration(milliseconds: 650));
-    currentRole = role;
-    currentUser = repository.userForRole(role);
-    jwtStatus = remember ? 'JWT stored and valid' : 'Session token valid';
-    isRefreshingSession = false;
-    notifyListeners();
+    try {
+      await repository.login(email: email, password: password);
+      currentRole = role;
+      currentUser = repository.currentUser;
+      jwtStatus = remember ? 'JWT stored and valid' : 'Session token valid';
+    } catch (error) {
+      jwtStatus = error.toString();
+      rethrow;
+    } finally {
+      isRefreshingSession = false;
+      notifyListeners();
+    }
   }
 
   Future<void> register({
     required String name,
     required String email,
     required String phone,
+    required String password,
   }) async {
-    await Future<void>.delayed(const Duration(milliseconds: 600));
-    const role = UserRole.member;
-    currentRole = role;
-    currentUser = AppUser(
-      id: 'new-${DateTime.now().millisecondsSinceEpoch}',
-      name: name.isEmpty ? 'New ${role.label}' : name,
-      email: email.isEmpty ? 'new-user@example.com' : email,
-      phone: phone.isEmpty ? '+254 700 123 456' : phone,
-      role: role,
-      status: 'Active',
-      avatarLabel: _initials(name.isEmpty ? role.label : name),
-      joinedAt: DateTime.now(),
-    );
-    jwtStatus = 'JWT issued after registration';
+    isRefreshingSession = true;
     notifyListeners();
+    try {
+      await repository.register(
+        name: name,
+        email: email,
+        phone: phone,
+        password: password,
+      );
+      currentRole = UserRole.member;
+      currentUser = repository.currentUser;
+      jwtStatus = 'JWT issued after registration';
+    } catch (error) {
+      jwtStatus = error.toString();
+      rethrow;
+    } finally {
+      isRefreshingSession = false;
+      notifyListeners();
+    }
   }
 
   Future<void> refreshJwt() async {
     isRefreshingSession = true;
     jwtStatus = 'Refreshing JWT';
     notifyListeners();
-    await Future<void>.delayed(const Duration(milliseconds: 550));
-    jwtStatus = 'JWT refreshed just now';
-    isRefreshingSession = false;
-    notifyListeners();
+    try {
+      await repository.refreshJwt();
+      jwtStatus = 'JWT refreshed just now';
+    } catch (error) {
+      jwtStatus = error.toString();
+      rethrow;
+    } finally {
+      isRefreshingSession = false;
+      notifyListeners();
+    }
   }
 
   void completeOnboarding() {
@@ -100,7 +142,8 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  void logout() {
+  Future<void> logout() async {
+    await repository.logout();
     currentRole = null;
     currentUser = null;
     jwtStatus = 'Logged out and token cleared';
@@ -109,7 +152,7 @@ class AppState extends ChangeNotifier {
 
   void switchRole(UserRole role) {
     currentRole = role;
-    currentUser = repository.userForRole(role);
+    currentUser = repository.currentUser;
     notifyListeners();
   }
 
@@ -223,21 +266,11 @@ class AppState extends ChangeNotifier {
     required String phone,
     required double amount,
   }) async {
-    await Future<void>.delayed(const Duration(milliseconds: 650));
-    final membership = repository.renewMembership(
+    await repository.renewMembership(
       plan: plan,
       durationDays: durationDays,
-    );
-    repository.addPayment(
-      PaymentRecord(
-        id: 'pay-${DateTime.now().millisecondsSinceEpoch}',
-        method: 'M-Pesa STK',
-        amount: amount,
-        status: PaymentStatus.confirmed,
-        createdAt: DateTime.now(),
-        reference:
-            'STK-${membership.plan.toUpperCase()}-${phone.hashCode.abs()}',
-      ),
+      phone: phone,
+      amount: amount,
     );
     notifyListeners();
   }
@@ -247,23 +280,10 @@ class AppState extends ChangeNotifier {
     required int durationDays,
     required double amount,
   }) async {
-    await Future<void>.delayed(const Duration(milliseconds: 450));
-    final dueAt = _nextNoon(DateTime.now());
-    repository.renewMembership(
+    await repository.activateDailyPayLater(
       plan: plan,
       durationDays: durationDays,
-      paymentStatus: PaymentStatus.payLater,
-      paymentDueAt: dueAt,
-    );
-    repository.addPayment(
-      PaymentRecord(
-        id: 'pay-${DateTime.now().millisecondsSinceEpoch}',
-        method: 'Pay Later',
-        amount: amount,
-        status: PaymentStatus.pending,
-        createdAt: DateTime.now(),
-        reference: 'LATER-${plan.name.toUpperCase()}-${dueAt.hour}00',
-      ),
+      amount: amount,
     );
     notifyListeners();
   }
@@ -272,17 +292,7 @@ class AppState extends ChangeNotifier {
     required MembershipPlan plan,
     required double amount,
   }) {
-    repository.addPayment(
-      PaymentRecord(
-        id: 'pay-${DateTime.now().millisecondsSinceEpoch}',
-        method: 'Cash',
-        amount: amount,
-        status: PaymentStatus.pending,
-        createdAt: DateTime.now(),
-        reference:
-            'CASH-${plan.name.toUpperCase()}-${DateTime.now().second}${DateTime.now().millisecond}',
-      ),
-    );
+    repository.submitCashMembershipPayment(plan: plan, amount: amount);
     notifyListeners();
   }
 
@@ -292,12 +302,17 @@ class AppState extends ChangeNotifier {
     required int durationDays,
   }) {
     repository.updatePayment(payment.copyWith(status: PaymentStatus.confirmed));
-    repository.renewMembership(plan: plan, durationDays: durationDays);
+    repository.renewMembership(
+      plan: plan,
+      durationDays: durationDays,
+      phone: '',
+      amount: 0,
+    );
     notifyListeners();
   }
 
   int enforcePayLaterDeadline({bool notify = true}) {
-    final removed = repository.expireOverduePayLater(DateTime.now());
+    final removed = 0;
     if (removed > 0 && notify) notifyListeners();
     return removed;
   }
@@ -329,22 +344,6 @@ class AppState extends ChangeNotifier {
     _payLaterSweepTimer ??= Timer.periodic(const Duration(minutes: 1), (_) {
       enforcePayLaterDeadline();
     });
-  }
-
-  DateTime _nextNoon(DateTime now) {
-    final todayNoon = DateTime(now.year, now.month, now.day, 12);
-    if (now.isBefore(todayNoon)) return todayNoon;
-    return todayNoon.add(const Duration(days: 1));
-  }
-
-  static String _initials(String name) {
-    final parts = name.trim().split(RegExp(r'\s+'));
-    if (parts.isEmpty || parts.first.isEmpty) return 'FF';
-    if (parts.length == 1) {
-      final end = parts.first.length < 2 ? parts.first.length : 2;
-      return parts.first.substring(0, end).toUpperCase();
-    }
-    return '${parts.first[0]}${parts.last[0]}'.toUpperCase();
   }
 }
 

@@ -780,7 +780,12 @@ class _AuthScreenState extends State<AuthScreen> {
   Future<void> _submitLogin(AppState state) async {
     if (!(_loginKey.currentState?.validate() ?? false)) return;
     final role = _loginRole;
-    await state.login(role, remember: role == UserRole.member && _remember);
+    await state.login(
+      role,
+      remember: role == UserRole.member && _remember,
+      email: _email.text.trim(),
+      password: _password.text,
+    );
   }
 
   Future<void> _submitRegistration(AppState state) async {
@@ -790,6 +795,7 @@ class _AuthScreenState extends State<AuthScreen> {
       name: _name.text.trim(),
       email: _email.text.trim(),
       phone: _phone.text.trim(),
+      password: _password.text,
     );
     if (!mounted) return;
     setState(() => _busy = false);
