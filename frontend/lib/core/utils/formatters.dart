@@ -45,6 +45,25 @@ String formatCountdown(DateTime expiry) {
   return '$days days left';
 }
 
+String formatTimeLeft(DateTime expiry) {
+  final remaining = expiry.difference(DateTime.now());
+  if (remaining.isNegative) return 'Expired';
+  final days = remaining.inDays;
+  final hours = remaining.inHours % 24;
+  final minutes = remaining.inMinutes % 60;
+
+  if (days > 0) {
+    return '$days days ${hours}h ${minutes}m left';
+  }
+  if (hours > 0) {
+    return '$hours hours ${minutes}m left';
+  }
+  if (minutes > 0) {
+    return '$minutes minutes left';
+  }
+  return 'Less than a minute left';
+}
+
 Color statusColor(BuildContext context, String status) {
   final scheme = Theme.of(context).colorScheme;
   switch (status.toLowerCase()) {

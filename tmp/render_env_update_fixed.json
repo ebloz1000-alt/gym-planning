@@ -1,0 +1,58 @@
+﻿[
+    {
+        "key":  "CSRF_TRUSTED_ORIGINS",
+        "value":  "https://gym-0mbn.onrender.com"
+    },
+    {
+        "key":  "ALLOWED_HOSTS",
+        "value":  "https://gym-0mbn.onrender.com"
+    },
+    {
+        "key":  "DEBUG",
+        "value":  "False"
+    },
+    {
+        "key":  "SECRET_KEY",
+        "value":  "40271524"
+    },
+    {
+        "key":  "CORS_ALLOWED_ORIGINS",
+        "value":  "https://fitflow-gym-frontend.onrender.com"
+    },
+    {
+        "key":  "API_BASE_URL",
+        "value":  "https://fitflow-gym-api.onrender.com/api"
+    },
+    {
+        "key":  "DARAJA_CONSUMER_SECRET",
+        "value":  "pGrSV4ZFi4sjS8syC3ckAbF30m54X9wQGwBTl8K8ATP8dT8vrfxnd9G6yGGoVoHs"
+    },
+    {
+        "key":  "DARAJA_CONSUMER_KEY",
+        "value":  "QNHFOQAmC7RAOJpg31Ml8xlm6tL0Aj0sH7yeqmhZFiUDGPcV"
+    },
+    {
+        "key":  "DARAJA_SHORTCODE",
+        "value":  "174379"
+    },
+    {
+        "key":  "DARAJA_PASSKEY",
+        "value":  "bfb279f9aa9bdbcf158e97dd71a467cd2e0c893059b10f78abf3c0d5c5c7ed0"
+    },
+    {
+        "key":  "DARAJA_ENV",
+        "value":  "sandbox"
+    },
+    {
+        "key":  "DARAJA_CALLBACK_URL",
+        "value":  "https://gym-0mbn.onrender.com/api/mpesa/callback/"
+    },
+    {
+        "key":  "NODE_ENV",
+        "value":  "production"
+    },
+    {
+        "key":  "DATABASE_URL",
+        "value":  "postgresql://neondb_owner:npg_uIbYe0U9nagx@ep-holy-sky-atjrstw0-pooler.c-9.us-east-1.aws.neon.tech/neondb?sslmode=require\u0026channel_binding=require"
+    }
+]

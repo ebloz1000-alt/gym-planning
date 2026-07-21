@@ -18,7 +18,34 @@ services:
         sync: false
       - key: DATABASE_URL
         sync: false
+      - key: SITE_URL
+        value: "https://<YOUR_RENDER_SERVICE>.onrender.com"
+        sync: false
+      - key: RENDER_API_KEY
+        sync: false
       - key: DARAJA_CONSUMER_KEY
         sync: false
       - key: DARAJA_CONSUMER_SECRET
+        sync: false
+      - key: DARAJA_PASSKEY
+        sync: false
+      - key: DARAJA_SHORTCODE
+        sync: false
+      - key: DARAJA_CALLBACK_URL
+        value: "https://<YOUR_RENDER_SERVICE>.onrender.com/api/mpesa/callback/"
+        sync: false
+      - key: DARAJA_ENV
+        sync: false
+  - type: web
+    name: fitflow-gym-frontend
+    env: static
+    rootDir: frontend
+    buildCommand: flutter build web --release
+    startCommand: ""
+    envVars:
+      - key: API_BASE_URL
+        value: "https://<YOUR_BACKEND_SERVICE>.onrender.com"
+        sync: false
+      - key: APP_NAME
+        value: "Gym Equipment & Trainer Booking Management Mobile Application"
         sync: false

@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_button.dart';
 import '../../core/widgets/app_fields.dart';
+import '../../core/widgets/install_app_button.dart';
 import '../../models/app_models.dart';
 import '../../providers_or_bloc/app_state.dart';
 import 'widgets/auth_components.dart';
@@ -147,7 +148,14 @@ class _AuthScreenState extends State<AuthScreen> {
                           child: Center(
                             child: SingleChildScrollView(
                               padding: const EdgeInsets.all(32),
-                              child: _authCard(state),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  _loginPageHeader(state),
+                                  const SizedBox(height: 18),
+                                  _authCard(state),
+                                ],
+                              ),
                             ),
                           ),
                         ),
@@ -174,6 +182,8 @@ class _AuthScreenState extends State<AuthScreen> {
                           ),
                         ),
                       ),
+                      const SizedBox(height: 18),
+                      _loginPageHeader(state),
                       const SizedBox(height: 18),
                       _authCard(state),
                     ],
@@ -213,6 +223,27 @@ class _AuthScreenState extends State<AuthScreen> {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _loginPageHeader(AppState state) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: const [
+            Text(
+              'Welcome to Gym Equipment & Trainer Booking Management Mobile Application',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            SizedBox(height: 4),
+            Text('Install the app for faster access and offline support.'),
+          ],
+        ),
+        const InstallAppButton(),
+      ],
     );
   }
 
@@ -550,9 +581,9 @@ class _AuthScreenState extends State<AuthScreen> {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: scheme.primary.withOpacity(.1),
+        color: scheme.primary.withValues(alpha: .1),
         borderRadius: BorderRadius.circular(brand.radiusMd),
-        border: Border.all(color: scheme.primary.withOpacity(.2)),
+        border: Border.all(color: scheme.primary.withValues(alpha: .2)),
       ),
       child: Row(
         children: [
@@ -579,13 +610,13 @@ class _AuthScreenState extends State<AuthScreen> {
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: isPortal
-            ? scheme.secondaryContainer.withOpacity(.42)
-            : scheme.primary.withOpacity(.1),
+            ? scheme.secondaryContainer.withValues(alpha: .42)
+            : scheme.primary.withValues(alpha: .1),
         borderRadius: BorderRadius.circular(brand.radiusMd),
         border: Border.all(
           color: isPortal
-              ? scheme.secondary.withOpacity(.24)
-              : scheme.primary.withOpacity(.2),
+              ? scheme.secondary.withValues(alpha: .24)
+              : scheme.primary.withValues(alpha: .2),
         ),
       ),
       child: Row(
@@ -749,7 +780,12 @@ class _AuthScreenState extends State<AuthScreen> {
   Future<void> _submitLogin(AppState state) async {
     if (!(_loginKey.currentState?.validate() ?? false)) return;
     final role = _loginRole;
-    await state.login(role, remember: role == UserRole.member && _remember);
+    await state.login(
+      role,
+      remember: role == UserRole.member && _remember,
+      email: _email.text.trim(),
+      password: _password.text,
+    );
   }
 
   Future<void> _submitRegistration(AppState state) async {
@@ -759,6 +795,7 @@ class _AuthScreenState extends State<AuthScreen> {
       name: _name.text.trim(),
       email: _email.text.trim(),
       phone: _phone.text.trim(),
+      password: _password.text,
     );
     if (!mounted) return;
     setState(() => _busy = false);
@@ -975,8 +1012,8 @@ class _WorkspaceCard extends StatelessWidget {
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
             color: selected
-                ? scheme.primary.withOpacity(.14)
-                : scheme.surface.withOpacity(.48),
+                ? scheme.primary.withValues(alpha: .14)
+                : scheme.surface.withValues(alpha: .48),
             borderRadius: BorderRadius.circular(brand.radiusMd),
             border: Border.all(
               color: selected ? scheme.primary : scheme.outlineVariant,
@@ -1080,7 +1117,7 @@ class _HeroSection extends StatelessWidget {
                           decoration: BoxDecoration(
                             color: page == i
                                 ? Colors.white
-                                : Colors.white.withOpacity(.38),
+                                : Colors.white.withValues(alpha: .38),
                             borderRadius: BorderRadius.circular(99),
                           ),
                         ),
@@ -1116,9 +1153,9 @@ class _HeroSlideView extends StatelessWidget {
           width: compact ? 52 : 66,
           height: compact ? 52 : 66,
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(.14),
+            color: Colors.white.withValues(alpha: .14),
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: Colors.white.withOpacity(.18)),
+            border: Border.all(color: Colors.white.withValues(alpha: .18)),
           ),
           child: Icon(slide.icon, color: Colors.white, size: compact ? 28 : 34),
         ),
@@ -1137,7 +1174,7 @@ class _HeroSlideView extends StatelessWidget {
           overflow: TextOverflow.ellipsis,
           style: Theme.of(
             context,
-          ).textTheme.bodyLarge?.copyWith(color: Colors.white.withOpacity(.82)),
+          ).textTheme.bodyLarge?.copyWith(color: Colors.white.withValues(alpha: .82)),
         ),
         SizedBox(height: compact ? 14 : 22),
         _MetricPill(value: slide.metric, label: slide.metricLabel),
@@ -1174,9 +1211,9 @@ class _HeroBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(.12),
+        color: Colors.white.withValues(alpha: .12),
         borderRadius: BorderRadius.circular(99),
-        border: Border.all(color: Colors.white.withOpacity(.16)),
+        border: Border.all(color: Colors.white.withValues(alpha: .16)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -1207,9 +1244,9 @@ class _MetricPill extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(.12),
+        color: Colors.white.withValues(alpha: .12),
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: Colors.white.withOpacity(.16)),
+        border: Border.all(color: Colors.white.withValues(alpha: .16)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -1225,7 +1262,7 @@ class _MetricPill extends StatelessWidget {
           Text(
             label,
             style: Theme.of(context).textTheme.labelMedium?.copyWith(
-              color: Colors.white.withOpacity(.78),
+              color: Colors.white.withValues(alpha: .78),
             ),
           ),
         ],

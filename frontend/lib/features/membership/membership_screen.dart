@@ -23,6 +23,8 @@ class _MembershipScreenState extends State<MembershipScreen> {
   String _paymentMethod = 'M-Pesa';
   int _vipDuration = 45;
   bool _isRenewing = false;
+  String? _paymentStatusText;
+  String? _paymentReference;
 
   @override
   void dispose() {
@@ -202,7 +204,7 @@ class _MembershipScreenState extends State<MembershipScreen> {
                   const SizedBox(height: 14),
                   AppTextField(
                     label: 'M-Pesa Phone Number',
-                    hint: '+254 700 000 000',
+                    hint: '07XXXXXXXX',
                     controller: _mpesaPhone,
                     icon: Icons.phone_android_outlined,
                     keyboardType: TextInputType.phone,
@@ -236,6 +238,30 @@ class _MembershipScreenState extends State<MembershipScreen> {
                   isLoading: _isRenewing,
                   onPressed: () => _submitRenewal(state),
                 ),
+                if (_paymentStatusText != null) ...[
+                  const SizedBox(height: 10),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          _paymentReference != null
+                              ? Icons.receipt_long_outlined
+                              : Icons.info_outline,
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(_paymentStatusText!),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
@@ -289,6 +315,45 @@ class _MembershipScreenState extends State<MembershipScreen> {
     return plan.price * (_vipDuration / plan.durationDays);
   }
 
+  String _normalizeMpesaNumber(String input) {
+    var phone = input.trim().replaceAll(RegExp(r'[\s-]'), '');
+    if (phone.startsWith('+')) phone = phone.substring(1);
+    if (phone.startsWith('0')) {
+      phone = '254${phone.substring(1)}';
+    } else if (phone.startsWith('7')) {
+      phone = '254$phone';
+    }
+    return phone;
+  }
+
+  Future<String?> _sendStkPush(AppState state, String phone, double amount, String planName, int durationDays) async {
+    try {
+      final normalized = _normalizeMpesaNumber(phone);
+      const accountReference = '0799657075';
+      final payload = await state.repository.initiateStkPush(
+        phone: normalized,
+        amount: amount,
+        planName: planName,
+        durationDays: durationDays,
+        accountReference: accountReference,
+      );
+      final reference = payload['reference']?.toString();
+      if (!mounted) return null;
+      setState(() {
+        _paymentReference = reference;
+        _paymentStatusText = 'STK push sent. Complete the prompt on your phone.';
+      });
+      return null;
+    } catch (error) {
+      if (!mounted) return null;
+      setState(() {
+        _paymentReference = null;
+        _paymentStatusText = 'STK push request failed: $error';
+      });
+      return error.toString();
+    }
+  }
+
   void _selectPlan(String name) {
     setState(() {
       _selectedPlan = name;
@@ -315,9 +380,9 @@ class _MembershipScreenState extends State<MembershipScreen> {
   }
 
   String? _validateMpesaPhone(String? value) {
-    final phone = (value ?? '').trim().replaceAll(RegExp(r'[\s-]'), '');
-    final isValid = RegExp(r'^(\+254|254|0)\d{9}$').hasMatch(phone);
-    if (!isValid) return 'Enter a valid M-Pesa phone number.';
+    final phone = value!.trim().replaceAll(RegExp(r'[\s-]'), '');
+    final isValid = RegExp(r'^07\d{8}$').hasMatch(phone);
+    if (!isValid) return 'Enter a valid M-Pesa number starting with 07';
     return null;
   }
 
@@ -340,12 +405,19 @@ class _MembershipScreenState extends State<MembershipScreen> {
       state.submitCashMembershipPayment(plan: plan, amount: amount);
       await Future<void>.delayed(const Duration(milliseconds: 250));
     } else {
-      await state.renewMembership(
-        plan: plan,
-        durationDays: durationDays,
-        phone: _mpesaPhone.text.trim(),
-        amount: amount,
+      final error = await _sendStkPush(state, _mpesaPhone.text.trim(), amount, plan.name, durationDays);
+      if (!mounted) return;
+      setState(() => _isRenewing = false);
+      if (error != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(error)),
+        );
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('STK Push sent — enter your PIN on the phone.')),
       );
+      return;
     }
     if (!mounted) return;
     setState(() => _isRenewing = false);

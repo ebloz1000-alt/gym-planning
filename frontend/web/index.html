@@ -29,8 +29,17 @@
   <!-- Favicon -->
   <link rel="icon" type="image/png" href="favicon.png"/>
 
-  <title>gym_booking_app</title>
+  <title>FitFlow</title>
   <link rel="manifest" href="manifest.json">
+  <!-- Add your app store identifiers so the site can redirect mobile users to stores -->
+  <meta name="android-package" content="com.fitflow.app">
+  <meta name="ios-app-id" content="987654321">
+  <!-- Optional direct APK URL (hosted on a secure HTTPS endpoint). Example: https://downloads.fitflow.app/fitflow-release.apk -->
+  <meta name="apk-url" content="https://downloads.fitflow.app/fitflow-release.apk">
+  <!-- Optional iOS OTA manifest (plist) URL for enterprise/TestFlight-like OTA installs -->
+  <meta name="ios-itms-manifest" content="https://downloads.fitflow.app/fitflow-manifest.plist">
+  <!-- Optional iOS universal link to open the app if installed -->
+  <meta name="ios-universal-link" content="https://fitflow.app/launch">
 </head>
 <body>
   <!--
@@ -42,5 +51,74 @@
     * https://docs.flutter.dev/platform-integration/web/initialization
   -->
   <script src="flutter_bootstrap.js" async></script>
+  <script>
+    // Handles PWA beforeinstallprompt and falls back to redirecting mobile users
+    // to the native app stores. Replace meta tags android-package / ios-app-id above.
+    let deferredPrompt;
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      deferredPrompt = e;
+      // Optionally, show a custom install affordance in your UI now.
+    });
+
+    function triggerInstall() {
+      if (deferredPrompt) {
+        deferredPrompt.prompt();
+        deferredPrompt.userChoice.then((choice) => {
+          deferredPrompt = null;
+        });
+        return;
+      }
+
+      const ua = navigator.userAgent || navigator.vendor || window.opera;
+      const androidPackage = document.querySelector('meta[name="android-package"]')?.content;
+      const iosAppId = document.querySelector('meta[name="ios-app-id"]')?.content;
+      const apkUrl = document.querySelector('meta[name="apk-url"]')?.content;
+      const iosItms = document.querySelector('meta[name="ios-itms-manifest"]')?.content;
+      const iosUniversal = document.querySelector('meta[name="ios-universal-link"]')?.content;
+
+      // ANDROID: try Play Store deep link, then APK direct download (if provided), then Play Store web
+      if (/android/i.test(ua) && androidPackage) {
+        try { window.location.href = `market://details?id=${androidPackage}`; } catch (e) {}
+        setTimeout(() => {
+          if (apkUrl) {
+            // Navigate to APK for direct download; user must allow installs from unknown sources
+            window.location.href = apkUrl;
+          } else {
+            window.location.href = `https://play.google.com/store/apps/details?id=${androidPackage}`;
+          }
+        }, 1200);
+        return;
+      }
+
+      // iOS: try universal link (to open app), then OTA manifest (itms-services), then App Store
+      if (/iPad|iPhone|iPod/.test(ua)) {
+        if (iosUniversal) {
+          window.location.href = iosUniversal;
+          return;
+        }
+        if (iosItms) {
+          // itms-services triggers OTA install for properly signed and provisioned enterprise IPA
+          window.location.href = `itms-services://?action=download-manifest&url=${encodeURIComponent(iosItms)}`;
+          return;
+        }
+        if (iosAppId) {
+          window.location.href = `itms-apps://itunes.apple.com/app/id${iosAppId}`;
+          return;
+        }
+      }
+
+      // Desktop or unknown: open Play Store web if Android package present, otherwise do nothing
+      if (androidPackage) {
+        window.location.href = `https://play.google.com/store/apps/details?id=${androidPackage}`;
+        return;
+      }
+
+      alert('Installation not available for this platform.');
+    }
+
+    // Expose to Flutter web via `dart:html` calls: `js.context.callMethod('triggerInstall')`
+    window.triggerInstall = triggerInstall;
+  </script>
 </body>
 </html>

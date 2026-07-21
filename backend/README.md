@@ -60,9 +60,29 @@ ALLOWED_HOSTS=<your-render-service>.onrender.com
 CSRF_TRUSTED_ORIGINS=https://<your-render-service>.onrender.com
 CORS_ALLOWED_ORIGINS=https://<your-frontend-domain>
 DATABASE_URL=<Neon pooled connection string>
-DARAJA_CONSUMER_KEY=<optional>
-DARAJA_CONSUMER_SECRET=<optional>
+DARAJA_CONSUMER_KEY=<your-daraja-consumer-key>
+DARAJA_CONSUMER_SECRET=<your-daraja-consumer-secret>
+DARAJA_SHORTCODE=<your-daraja-shortcode>
+DARAJA_PASSKEY=<your-daraja-passkey>
+DARAJA_ENV=sandbox
+DARAJA_CALLBACK_URL=https://<your-public-domain>/api/mpesa/callback/
 ```
+
+For local development with Daraja sandbox, expose the backend using a public HTTPS tunnel such as ngrok or localtunnel, then update `DARAJA_CALLBACK_URL` to the tunnel URL plus `/api/mpesa/callback/`.
+
+Example with ngrok:
+
+```bash
+ngrok http 8000
+```
+
+Then set:
+
+```env
+DARAJA_CALLBACK_URL=https://<your-ngrok-subdomain>.ngrok.io/api/mpesa/callback/
+```
+
+This is required because the Daraja sandbox and production environments must reach your callback endpoint over HTTPS.
 
 After deploy, open a Render shell and run:
 

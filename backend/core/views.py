@@ -40,6 +40,22 @@ from core.serializers import (
     UserSerializer,
     EmailTokenObtainPairSerializer,
 )
+from core.mpesa import stk_push, MPesaError
+from rest_framework.permissions import AllowAny
+from django.http import HttpResponse, JsonResponse
+from io import BytesIO
+
+# optional server-side export libs
+try:
+    from reportlab.lib.pagesizes import letter
+    from reportlab.pdfgen import canvas
+except Exception:
+    letter = None
+
+try:
+    from openpyxl import Workbook
+except Exception:
+    Workbook = None
 
 
 class EmailTokenObtainPairView(TokenObtainPairView):
@@ -130,6 +146,127 @@ class MembershipRecordViewSet(viewsets.ModelViewSet):
         serializer.is_valid(raise_exception=True)
         record = serializer.save()
         return Response(MembershipRecordSerializer(record).data, status=status.HTTP_201_CREATED)
+
+
+class MpesaStkPushAPIView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        phone = request.data.get("phone")
+        amount = request.data.get("amount")
+        plan_name = request.data.get("plan_name")
+        duration_days = request.data.get("duration_days")
+        account_ref = request.data.get("account_reference", "GYM")
+        if not phone or not amount or not plan_name:
+            return Response({"detail": "phone, amount and plan_name are required"}, status=400)
+
+        # create a pending payment record to link with the STK push
+        reference = f"STK-{uuid.uuid4().hex[:10].upper()}"
+        payment = PaymentRecord.objects.create(
+            user=request.user,
+            method="M-Pesa STK",
+            amount=amount,
+            status=PaymentStatus.PENDING,
+            reference=reference,
+            metadata={
+                "phone": phone,
+                "plan_name": plan_name,
+                "duration_days": duration_days,
+            },
+        )
+
+        try:
+            resp = stk_push(phone=str(phone), amount=int(amount), account_reference=account_ref)
+        except MPesaError as e:
+            payment.metadata.update({"error": str(e)})
+            payment.save(update_fields=["metadata"])  # keep record of failure
+            return Response({"detail": str(e)}, status=500)
+
+        # record Daraja identifiers for mapping later in callback
+        merchant_id = resp.get("MerchantRequestID")
+        checkout_id = resp.get("CheckoutRequestID")
+        meta = payment.metadata or {}
+        meta.update({"merchant_request_id": merchant_id, "checkout_request_id": checkout_id, "daraja_response": resp})
+        payment.metadata = meta
+        payment.save(update_fields=["metadata"])
+
+        return Response({"success": True, "reference": payment.reference, "merchant_request_id": merchant_id, "checkout_request_id": checkout_id})
+
+
+class MpesaCallbackAPIView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        # Daraja posts a JSON payload with Body.stkCallback
+        body = request.data or {}
+        stk = body.get("Body", {}).get("stkCallback")
+        if not stk:
+            return Response({"detail": "invalid callback"}, status=400)
+
+        merchant_req = stk.get("MerchantRequestID")
+        checkout_req = stk.get("CheckoutRequestID")
+        result_code = stk.get("ResultCode")
+        result_desc = stk.get("ResultDesc")
+
+        # try to find the pending payment by checkout or merchant id
+        payment = None
+        candidates = PaymentRecord.objects.filter(status=PaymentStatus.PENDING)
+        for p in candidates:
+            md = p.metadata or {}
+            if md.get("checkout_request_id") == checkout_req or md.get("merchant_request_id") == merchant_req:
+                payment = p
+                break
+
+        if not payment:
+            return Response({"detail": "payment record not found"}, status=404)
+
+        # attach callback info
+        md = payment.metadata or {}
+        md.update({"callback_result_code": result_code, "callback_result_desc": result_desc})
+
+        if int(result_code) == 0:
+            # success -> parse metadata items
+            items = stk.get("CallbackMetadata", {}).get("Item", [])
+            parsed = {item.get("Name"): item.get("Value") for item in items if item.get("Name")}
+            md.update({"callback_data": parsed})
+            payment.status = PaymentStatus.CONFIRMED
+            payment.metadata = md
+            payment.save(update_fields=["status", "metadata", "updated_at"])
+
+            # create membership now using stored plan info
+            plan_name = md.get("plan_name")
+            duration_days = md.get("duration_days") or 0
+            try:
+                plan = MembershipPlan.objects.get(name=plan_name)
+                started_at = timezone.now()
+                membership = MembershipRecord.objects.create(
+                    user=payment.user,
+                    plan=plan,
+                    started_at=started_at,
+                    expires_at=started_at + timedelta(days=int(duration_days or plan.duration_days)),
+                    status="Active",
+                    payment_status=PaymentStatus.CONFIRMED,
+                )
+                payment.membership = membership
+                payment.save(update_fields=["membership"])
+
+                # add a notification for the user
+                Notification.objects.create(
+                    user=payment.user,
+                    type="payment",
+                    title="Payment received",
+                    message=f"Payment {payment.reference} confirmed. Membership {plan.name} activated.",
+                )
+            except MembershipPlan.DoesNotExist:
+                # plan missing; still keep payment confirmed
+                pass
+        else:
+            md.update({"callback_data": stk.get("CallbackMetadata", {})})
+            payment.status = PaymentStatus.FAILED
+            payment.metadata = md
+            payment.save(update_fields=["status", "metadata", "updated_at"])
+
+        return Response({"ok": True})
 
 
 class EquipmentItemViewSet(viewsets.ModelViewSet):
@@ -361,3 +498,110 @@ class ReportsAPIView(APIView):
             },
         ]
         return Response(rows)
+
+
+class ExportReportAPIView(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        fmt = (request.GET.get("format") or "pdf").lower()
+        export_type = (request.GET.get("type") or request.GET.get("report") or "dashboard").lower()
+        rng = request.GET.get("range") or "Monthly"
+
+        # build rows similar to ReportsAPIView or membership
+        if export_type == "membership" or request.path.endswith("membership/"):
+            # try to fetch membership for user, fallback to latest record
+            membership = None
+            try:
+                if request.user and request.user.is_authenticated:
+                    membership = (
+                        MembershipRecord.objects.filter(user=request.user)
+                        .order_by("-started_at")
+                        .first()
+                    )
+            except Exception:
+                membership = None
+
+            if not membership:
+                return JsonResponse({"detail": "No membership found"}, status=404)
+
+            rows = [
+                {"title": "Plan", "metric": membership.plan.name if hasattr(membership.plan, 'name') else str(membership.plan), "change": "", "status": membership.status},
+                {"title": "Started", "metric": membership.started_at.isoformat(), "change": "", "status": membership.status},
+                {"title": "Expires", "metric": membership.expires_at.isoformat(), "change": f"{(membership.expires_at - membership.started_at).days} days", "status": membership.status},
+                {"title": "Payment", "metric": getattr(membership, 'payment_status', '') and str(membership.payment_status) or '', "change": getattr(membership, 'payment_due_at', None) and (membership.payment_due_at.isoformat()) or '', "status": membership.status},
+            ]
+            filename_base = f"membership_{membership.user.id if membership.user_id else 'anon'}"
+        else:
+            # admin/dashboard report
+            active_memberships = MembershipRecord.objects.filter(
+                status__iexact="Active",
+                expires_at__gt=timezone.now(),
+            ).count()
+            completed_sessions = Booking.objects.filter(status=BookingStatus.COMPLETED).count()
+            capacity = EquipmentItem.objects.aggregate(value=Sum("capacity")).get("value") or 1
+            booked = EquipmentItem.objects.aggregate(value=Sum("booked")).get("value") or 0
+            revenue = (
+                PaymentRecord.objects.filter(status=PaymentStatus.CONFIRMED)
+                .aggregate(value=Sum("amount"))
+                .get("value")
+                or 0
+            )
+
+            rows = [
+                {"title": "Daily revenue", "metric": f"KES {float(revenue):,.0f}", "change": "+0%", "status": "Ready"},
+                {"title": "Trainer performance", "metric": f"{completed_sessions} sessions", "change": "+0%", "status": "Ready"},
+                {"title": "Equipment usage", "metric": f"{round(booked / capacity * 100)}% utilization", "change": "+0%", "status": "Review"},
+                {"title": "Membership growth", "metric": f"{active_memberships} active", "change": "+0%", "status": "Ready"},
+            ]
+            filename_base = f"dashboard_report"
+
+        # generate file
+        if fmt == "pdf":
+            buffer = BytesIO()
+            if letter is None:
+                return JsonResponse({"detail": "reportlab not installed on server"}, status=500)
+            c = canvas.Canvas(buffer, pagesize=letter)
+            x = 40
+            y = 750
+            c.setFont("Helvetica-Bold", 16)
+            c.drawString(x, y, "Gym Booking Report")
+            y -= 24
+            c.setFont("Helvetica", 10)
+            c.drawString(x, y, f"Range: {rng}")
+            y -= 16
+            c.drawString(x, y, f"Generated: {timezone.now().isoformat()}")
+            y -= 24
+            for row in rows:
+                if y < 80:
+                    c.showPage()
+                    y = 750
+                c.setFont("Helvetica-Bold", 11)
+                c.drawString(x, y, row.get("title", ""))
+                c.setFont("Helvetica", 10)
+                c.drawString(x + 140, y, row.get("metric", ""))
+                c.drawString(x + 320, y, row.get("change", ""))
+                c.drawString(x + 420, y, row.get("status", ""))
+                y -= 18
+            c.showPage()
+            c.save()
+            buffer.seek(0)
+            response = HttpResponse(buffer.getvalue(), content_type="application/pdf")
+            response["Content-Disposition"] = f'attachment; filename="{filename_base}.pdf"'
+            return response
+        else:
+            # xlsx
+            if Workbook is None:
+                return JsonResponse({"detail": "openpyxl not installed on server"}, status=500)
+            wb = Workbook()
+            ws = wb.active
+            ws.title = "Report"
+            ws.append(["Title", "Metric", "Change", "Status"])
+            for row in rows:
+                ws.append([row.get("title"), row.get("metric"), row.get("change"), row.get("status")])
+            buffer = BytesIO()
+            wb.save(buffer)
+            buffer.seek(0)
+            response = HttpResponse(buffer.getvalue(), content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+            response["Content-Disposition"] = f'attachment; filename="{filename_base}.xlsx"'
+            return response
