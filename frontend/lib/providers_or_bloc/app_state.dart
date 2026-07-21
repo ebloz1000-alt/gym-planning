@@ -71,30 +71,31 @@ class AppState extends ChangeNotifier {
     super.dispose();
   }
 
-  Future<void> login(
+  Future<bool> login(
     UserRole role, {
     required bool remember,
     required String email,
     required String password,
   }) async {
     isRefreshingSession = true;
-    rememberMe = remember;
     notifyListeners();
     try {
       await repository.login(email: email, password: password);
+      rememberMe = remember;
       currentRole = role;
       currentUser = repository.currentUser;
       jwtStatus = remember ? 'JWT stored and valid' : 'Session token valid';
+      return true;
     } catch (error) {
       jwtStatus = error.toString();
-      rethrow;
+      return false;
     } finally {
       isRefreshingSession = false;
       notifyListeners();
     }
   }
 
-  Future<void> register({
+  Future<bool> register({
     required String name,
     required String email,
     required String phone,
@@ -112,9 +113,10 @@ class AppState extends ChangeNotifier {
       currentRole = UserRole.member;
       currentUser = repository.currentUser;
       jwtStatus = 'JWT issued after registration';
+      return true;
     } catch (error) {
       jwtStatus = error.toString();
-      rethrow;
+      return false;
     } finally {
       isRefreshingSession = false;
       notifyListeners();

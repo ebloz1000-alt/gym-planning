@@ -5,20 +5,11 @@ import 'package:flutter/material.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_button.dart';
 import '../../core/widgets/app_fields.dart';
-import '../../core/widgets/install_app_button.dart';
 import '../../models/app_models.dart';
 import '../../providers_or_bloc/app_state.dart';
 import 'widgets/auth_components.dart';
 
-enum _AuthMode {
-  register,
-  signIn,
-  trainerLogin,
-  adminLogin,
-  forgot,
-  otp,
-  reset,
-}
+enum _AuthMode { register, signIn, trainerLogin, adminLogin, forgot, otp, reset }
 
 class AuthScreen extends StatefulWidget {
   const AuthScreen({super.key});
@@ -148,14 +139,7 @@ class _AuthScreenState extends State<AuthScreen> {
                           child: Center(
                             child: SingleChildScrollView(
                               padding: const EdgeInsets.all(32),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.stretch,
-                                children: [
-                                  _loginPageHeader(state),
-                                  const SizedBox(height: 18),
-                                  _authCard(state),
-                                ],
-                              ),
+                              child: _authCard(state),
                             ),
                           ),
                         ),
@@ -182,8 +166,6 @@ class _AuthScreenState extends State<AuthScreen> {
                           ),
                         ),
                       ),
-                      const SizedBox(height: 18),
-                      _loginPageHeader(state),
                       const SizedBox(height: 18),
                       _authCard(state),
                     ],
@@ -226,35 +208,24 @@ class _AuthScreenState extends State<AuthScreen> {
     );
   }
 
-  Widget _loginPageHeader(AppState state) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: const [
-            Text(
-              'Welcome to Gym Equipment & Trainer Booking Management Mobile Application',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-            SizedBox(height: 4),
-            Text('Install the app for faster access and offline support.'),
-          ],
-        ),
-        const InstallAppButton(),
-      ],
-    );
-  }
-
   Widget _cardHeader(AppState state) {
     final scheme = Theme.of(context).colorScheme;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
+            Row(
           children: [
             const Expanded(child: AnimatedBrandMark(size: 46)),
+            if (state.pwaManager.available)
+              IconButton.filledTonal(
+                tooltip: 'Install App',
+                icon: const Icon(Icons.download_rounded),
+                onPressed: () async {
+                  final res = await state.pwaManager.promptInstall();
+                  // ignore: avoid_print
+                  print('PWA install outcome: $res');
+                },
+              ),
             IconButton.filledTonal(
               tooltip: state.themeMode == ThemeMode.dark
                   ? 'Use light mode'
@@ -592,9 +563,9 @@ class _AuthScreenState extends State<AuthScreen> {
           Expanded(
             child: Text(
               'All new accounts are created as Member accounts.',
-              style: Theme.of(
-                context,
-              ).textTheme.labelLarge?.copyWith(color: scheme.onSurface),
+              style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                color: scheme.onSurface,
+              ),
             ),
           ),
         ],
@@ -661,10 +632,7 @@ class _AuthScreenState extends State<AuthScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'Choose Workspace',
-          style: Theme.of(context).textTheme.titleMedium,
-        ),
+        Text('Choose Workspace', style: Theme.of(context).textTheme.titleMedium),
         const SizedBox(height: 10),
         LayoutBuilder(
           builder: (context, constraints) {
@@ -779,19 +747,25 @@ class _AuthScreenState extends State<AuthScreen> {
 
   Future<void> _submitLogin(AppState state) async {
     if (!(_loginKey.currentState?.validate() ?? false)) return;
+    setState(() => _busy = true);
     final role = _loginRole;
-    await state.login(
+    final success = await state.login(
       role,
       remember: role == UserRole.member && _remember,
       email: _email.text.trim(),
       password: _password.text,
     );
+    if (!mounted) return;
+    setState(() => _busy = false);
+    if (!success) {
+      _showFeedback('Unable to sign in. Check your credentials and try again.');
+    }
   }
 
   Future<void> _submitRegistration(AppState state) async {
     if (!(_registerKey.currentState?.validate() ?? false)) return;
     setState(() => _busy = true);
-    await state.register(
+    final success = await state.register(
       name: _name.text.trim(),
       email: _email.text.trim(),
       phone: _phone.text.trim(),
@@ -799,6 +773,15 @@ class _AuthScreenState extends State<AuthScreen> {
     );
     if (!mounted) return;
     setState(() => _busy = false);
+    if (success) {
+      await _showSuccessDialog(
+        title: 'Registration complete',
+        message: 'Your account was created. Please sign in to continue.',
+      );
+      setState(() => _mode = _AuthMode.signIn);
+    } else {
+      _showFeedback('Unable to create account. Please try again.');
+    }
   }
 
   Future<void> _sendOtp() async {
@@ -1074,6 +1057,7 @@ class _HeroSection extends StatelessWidget {
       child: Stack(
         fit: StackFit.expand,
         children: [
+          Positioned.fill(child: CustomPaint(painter: _HeroPatternPainter())),
           SafeArea(
             child: Padding(
               padding: EdgeInsets.all(compact ? 22 : 44),
@@ -1285,4 +1269,46 @@ class _HeroSlide {
   final String message;
   final String metric;
   final String metricLabel;
+}
+
+class _HeroPatternPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final line = Paint()
+      ..color = Colors.white.withValues(alpha: .08)
+      ..strokeWidth = 1.2;
+    final strongLine = Paint()
+      ..color = Colors.white.withValues(alpha: .14)
+      ..strokeWidth = 2.4;
+
+    for (var x = -size.height; x < size.width + size.height; x += 44) {
+      canvas.drawLine(
+        Offset(x.toDouble(), size.height),
+        Offset(x + size.height * .72, 0),
+        line,
+      );
+    }
+
+    final barPaint = Paint()..color = Colors.white.withValues(alpha: .1);
+    final bars = [
+      Rect.fromLTWH(size.width * .68, size.height * .16, 92, 8),
+      Rect.fromLTWH(size.width * .72, size.height * .20, 142, 8),
+      Rect.fromLTWH(size.width * .66, size.height * .24, 112, 8),
+    ];
+    for (final bar in bars) {
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(bar, const Radius.circular(99)),
+        barPaint,
+      );
+    }
+
+    canvas.drawLine(
+      Offset(size.width * .12, size.height * .82),
+      Offset(size.width * .42, size.height * .72),
+      strongLine,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

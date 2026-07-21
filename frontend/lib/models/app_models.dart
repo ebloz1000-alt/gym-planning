@@ -100,6 +100,14 @@ class MembershipPlan {
     required this.highlight,
   });
 
+  static const MembershipPlan fallback = MembershipPlan(
+    name: 'Monthly',
+    durationDays: 30,
+    price: 6800,
+    features: <String>['Unlimited access', '8 trainer sessions', 'Progress review'],
+    highlight: true,
+  );
+
   final String name;
   final int durationDays;
   final double price;

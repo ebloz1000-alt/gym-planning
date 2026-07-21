@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/utils/formatters.dart';
 import '../../core/widgets/app_button.dart';
 import '../../core/widgets/app_cards.dart';
+import '../../core/widgets/state_views.dart';
 import '../../core/widgets/status_badge.dart';
 import '../../models/app_models.dart';
 import '../../providers_or_bloc/app_state.dart';
@@ -65,7 +66,9 @@ class _PaymentScreenState extends State<PaymentScreen> {
               ListTile(
                 contentPadding: EdgeInsets.zero,
                 leading: const Icon(Icons.receipt_long_outlined),
-                title: Text('Booking balance ${formatMoney(1200)}'),
+                title: Text(
+                  'Booking balance ${formatMoney(repo.payments.isEmpty ? 0 : repo.payments.fold<double>(0, (total, payment) => total + payment.amount))}',
+                ),
                 subtitle: Text(
                   _method == 'M-Pesa'
                       ? 'STK Push expires in 04:59'
@@ -159,20 +162,27 @@ class _PaymentScreenState extends State<PaymentScreen> {
             ),
         ],
         const SectionHeader(title: 'Payment history'),
-        ...repo.payments.map(
-          (payment) => AppCard(
-            child: ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: const Icon(Icons.receipt_outlined),
-              title: Text('${payment.method} - ${formatMoney(payment.amount)}'),
-              subtitle: Text(
-                '${payment.reference}\n${formatDate(payment.createdAt)}',
+        if (repo.payments.isEmpty)
+          const EmptyStateView(
+            title: 'No payments yet',
+            message: 'Payment history will appear here once transactions occur.',
+            icon: Icons.receipt_long_outlined,
+          )
+        else
+          ...repo.payments.map(
+            (payment) => AppCard(
+              child: ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.receipt_outlined),
+                title: Text('${payment.method} - ${formatMoney(payment.amount)}'),
+                subtitle: Text(
+                  '${payment.reference}\n${formatDate(payment.createdAt)}',
+                ),
+                isThreeLine: true,
+                trailing: StatusBadge(label: payment.status.label, compact: true),
               ),
-              isThreeLine: true,
-              trailing: StatusBadge(label: payment.status.label, compact: true),
             ),
           ),
-        ),
       ],
     );
   }
@@ -212,7 +222,10 @@ class _PaymentScreenState extends State<PaymentScreen> {
     AppState state,
     PaymentRecord payment,
   ) {
-    var selectedPlan = state.repository.membershipPlans.first.name;
+    final availablePlans = state.repository.membershipPlans.isEmpty
+        ? <MembershipPlan>[MembershipPlan.fallback]
+        : state.repository.membershipPlans;
+    var selectedPlan = availablePlans.first.name;
     showDialog<void>(
       context: context,
       builder: (dialogContext) => StatefulBuilder(
@@ -231,9 +244,9 @@ class _PaymentScreenState extends State<PaymentScreen> {
                   decoration: const InputDecoration(
                     labelText: 'Activate membership plan',
                   ),
-                  items: state.repository.membershipPlans
-                      .map(
-                        (plan) => DropdownMenuItem(
+                  items: availablePlans
+                      .map<DropdownMenuItem<String>>(
+                        (plan) => DropdownMenuItem<String>(
                           value: plan.name,
                           child: Text(
                             '${plan.name} - ${formatMoney(plan.price)}',
