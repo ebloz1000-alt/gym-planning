@@ -76,7 +76,7 @@ class _QuickStats extends StatelessWidget {
   });
 
   final int bookingsCount;
-  final MembershipRecord membership;
+  final MembershipRecord? membership;
   final int pendingPayments;
   final int unreadNotifications;
 
@@ -100,7 +100,7 @@ class _QuickStats extends StatelessWidget {
         ),
         _StatBox(
           title: 'Plan',
-          value: membership.plan,
+          value: membership?.plan ?? 'No membership',
           icon: Icons.workspace_premium_outlined,
           color: Colors.indigo,
         ),
@@ -204,17 +204,28 @@ class _NextBookingCard extends StatelessWidget {
 class _MembershipCard extends StatelessWidget {
   const _MembershipCard({required this.membership});
 
-  final MembershipRecord membership;
+  final MembershipRecord? membership;
 
   @override
   Widget build(BuildContext context) {
+    if (membership == null) {
+      return Card(
+        child: ListTile(
+          contentPadding: const EdgeInsets.all(18),
+          leading: const Icon(Icons.card_membership_outlined),
+          title: const Text('No active membership'),
+          subtitle: const Text('Select a membership plan to unlock booking access.'),
+          trailing: const Icon(Icons.chevron_right),
+        ),
+      );
+    }
     return Card(
       child: ListTile(
         contentPadding: const EdgeInsets.all(18),
         leading: const Icon(Icons.card_membership_outlined),
-        title: Text('${membership.plan} membership'),
+        title: Text('${membership!.plan} membership'),
         subtitle: Text(
-          '${membership.status} until ${formatDate(membership.expiresAt)}',
+          '${membership!.status} until ${formatDate(membership!.expiresAt)}',
         ),
         trailing: const Icon(Icons.chevron_right),
       ),

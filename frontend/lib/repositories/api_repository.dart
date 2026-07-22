@@ -103,13 +103,26 @@ class ApiRepository {
     await _loadProtectedData();
   }
 
-  Future<void> register({required String name, required String email, required String phone, required String password}) async {
-    final body = {
+  Future<void> register({
+    required String name,
+    required String email,
+    required String phone,
+    required String password,
+    int? planId,
+    int? durationDays,
+  }) async {
+    final Map<String, dynamic> body = {
       'name': name,
       'email': email,
       'phone': phone,
       'password': password,
     };
+    if (planId != null) {
+      body['plan_id'] = planId;
+    }
+    if (durationDays != null) {
+      body['duration_days'] = durationDays;
+    }
     final response = await _post('/api/auth/register/', body: body);
     if (response.statusCode != 201) {
       throw _parseError(response, fallback: 'Unable to create account.');
@@ -161,24 +174,37 @@ class ApiRepository {
     await prefs.remove('refresh_token');
   }
 
-  MembershipRecord get currentMembership {
-    final now = DateTime.now();
-    return MembershipRecord(
-      plan: _membershipPlans.isNotEmpty ? _membershipPlans.first.name : 'Monthly',
-      startedAt: now.subtract(const Duration(days: 30)),
-      expiresAt: now.add(const Duration(days: 30)),
-      status: 'Active',
-    );
+  MembershipRecord? get currentMembership {
+    if (_membershipHistory.isEmpty) return null;
+    // Return the most recent membership record
+    return _membershipHistory.last;
   }
 
-  MembershipRecord? get activeMembership => null;
+  MembershipRecord? get activeMembership {
+    if (_membershipHistory.isEmpty) return null;
+    final now = DateTime.now();
+    // Return the membership that is currently active (not expired)
+    try {
+      return _membershipHistory.firstWhere(
+        (record) => record.status.toLowerCase() == 'active' &&
+            record.expiresAt.isAfter(now) &&
+            record.startedAt.isBefore(now),
+      );
+    } catch (e) {
+      return null;
+    }
+  }
 
-  bool get hasBookableMembership => false;
+  bool get hasBookableMembership {
+    final membership = activeMembership;
+    return membership != null && membership.isBookable;
+  }
 
   MembershipPlan membershipPlanByName(String name) {
     return _membershipPlans.firstWhere(
       (plan) => plan.name == name,
       orElse: () => const MembershipPlan(
+        id: 0,
         name: 'Daily',
         durationDays: 1,
         price: 0,
@@ -195,12 +221,20 @@ class ApiRepository {
     return List.unmodifiable(slots.where((slot) => slot == key ? true : true).toList());
   }
 
-  Future<void> renewMembership({required MembershipPlan plan, required int durationDays, required String phone, required double amount}) async {
+  Future<void> renewMembership({
+    required MembershipPlan plan,
+    required int durationDays,
+    required String phone,
+    required double amount,
+    required String paymentStatus,
+  }) async {
     final response = await _post(
       '/api/memberships/renew/',
       body: {
-        'plan_id': _planIdByName(plan.name),
-        'payment_status': 'confirmed',
+        'plan_id': plan.id,
+        'duration_days': durationDays,
+        'amount': amount,
+        'payment_status': paymentStatus,
       },
     );
     if (response.statusCode != 201) {
@@ -210,7 +244,23 @@ class ApiRepository {
   }
 
   Future<void> activateDailyPayLater({required MembershipPlan plan, required int durationDays, required double amount}) async {
-    await renewMembership(plan: plan, durationDays: durationDays, phone: '', amount: amount);
+    await renewMembership(
+      plan: plan,
+      durationDays: durationDays,
+      phone: '',
+      amount: amount,
+      paymentStatus: 'payLater',
+    );
+  }
+
+  Future<void> submitCashMembershipPayment({required MembershipPlan plan, required int durationDays, required double amount}) async {
+    await renewMembership(
+      plan: plan,
+      durationDays: durationDays,
+      phone: '',
+      amount: amount,
+      paymentStatus: 'pending',
+    );
   }
 
   Future<Map<String, dynamic>> initiateStkPush({
@@ -240,8 +290,6 @@ class ApiRepository {
     throw Exception(payload['detail']?.toString() ?? 'Unable to send STK request.');
   }
 
-  void submitCashMembershipPayment({required MembershipPlan plan, required double amount}) {}
-
   Future<void> _loadPublicData() async {
     final futures = <Future<void>>[
       _loadMembershipPlans(),
@@ -255,6 +303,7 @@ class ApiRepository {
   Future<void> _loadProtectedData() async {
     if (!_isAuthenticated) return;
     final futures = <Future<void>>[
+      _loadMemberships(),
       _loadBookings(),
       _loadPayments(),
       _loadNotifications(),
@@ -271,6 +320,16 @@ class ApiRepository {
     _membershipPlans
       ..clear()
       ..addAll(items.map(_mapMembershipPlan));
+  }
+
+  Future<void> _loadMemberships() async {
+    final response = await _get('/api/memberships/');
+    if (response.statusCode != 200) return;
+    final payload = _decodeJson(response.body);
+    final items = _listFromJson(payload);
+    _membershipHistory
+      ..clear()
+      ..addAll(items.map(_mapMembershipRecord));
   }
 
   Future<void> _loadEquipment() async {
@@ -358,7 +417,11 @@ class ApiRepository {
     if (token != null && token.isNotEmpty) {
       headers['Authorization'] = 'Bearer $token';
     }
-    return _client.get(uri, headers: headers);
+    try {
+      return await _client.get(uri, headers: headers).timeout(const Duration(seconds: 10));
+    } catch (_) {
+      return http.Response('{"detail":"Backend unavailable. Please try again in a moment."}', 503);
+    }
   }
 
   Future<http.Response> _post(String path, {required Map<String, dynamic> body}) async {
@@ -368,7 +431,11 @@ class ApiRepository {
     if (token != null && token.isNotEmpty) {
       headers['Authorization'] = 'Bearer $token';
     }
-    return _client.post(uri, headers: headers, body: json.encode(body));
+    try {
+      return await _client.post(uri, headers: headers, body: json.encode(body)).timeout(const Duration(seconds: 10));
+    } catch (_) {
+      return http.Response('{"detail":"Backend unavailable. Please try again in a moment."}', 503);
+    }
   }
 
   Future<void> _restoreSession() async {
@@ -396,28 +463,44 @@ class ApiRepository {
     _users.clear();
   }
 
-  int _planIdByName(String name) {
-    final plan = _membershipPlans.firstWhere(
-      (item) => item.name == name,
-      orElse: () => const MembershipPlan(
-        name: 'Daily',
-        durationDays: 1,
-        price: 0,
-        features: [],
-        highlight: false,
-      ),
-    );
-    return _membershipPlans.indexOf(plan) + 1;
+  bool _hasPublicData() {
+    return _membershipPlans.isNotEmpty ||
+        _equipment.isNotEmpty ||
+        _trainers.isNotEmpty ||
+        _revenueTrend.isNotEmpty ||
+        _bookingTrend.isNotEmpty ||
+        _equipmentUsage.isNotEmpty;
+  }
+
+  bool _hasProtectedData() {
+    return _membershipHistory.isNotEmpty ||
+        _bookings.isNotEmpty ||
+        _payments.isNotEmpty ||
+        _notifications.isNotEmpty ||
+        _feedback.isNotEmpty;
   }
 
   MembershipPlan _mapMembershipPlan(dynamic item) {
     final map = item as Map<String, dynamic>;
     return MembershipPlan(
+      id: int.tryParse(map['id']?.toString() ?? '') ?? 0,
       name: map['name']?.toString() ?? 'Plan',
       durationDays: int.tryParse(map['duration_days']?.toString() ?? '') ?? 0,
       price: double.tryParse(map['price']?.toString() ?? '') ?? 0,
       features: (map['features'] as List?)?.map((feature) => feature.toString()).toList() ?? const <String>[],
       highlight: map['highlight'] == true,
+    );
+  }
+
+  MembershipRecord _mapMembershipRecord(dynamic item) {
+    final map = item as Map<String, dynamic>;
+    return MembershipRecord(
+      plan: map['plan']?.toString() ?? 'Plan',
+      startedAt: DateTime.parse(map['started_at']?.toString() ?? DateTime.now().toIso8601String()),
+      expiresAt: DateTime.parse(map['expires_at']?.toString() ?? DateTime.now().toIso8601String()),
+      status: map['status']?.toString() ?? 'Active',
+      paymentStatus: _paymentStatus(map['payment_status']?.toString()),
+      paymentDueAt: map['payment_due_at'] != null ? DateTime.parse(map['payment_due_at'].toString()) : null,
     );
   }
 
@@ -593,8 +676,28 @@ class ApiRepository {
 
   Exception _parseError(http.Response response, {required String fallback}) {
     final decoded = _decodeJson(response.body);
-    final detail = decoded is Map<String, dynamic> ? decoded['detail'] : null;
-    return Exception(detail?.toString() ?? fallback);
+    if (decoded is Map<String, dynamic>) {
+      if (decoded.containsKey('detail')) {
+        return Exception(decoded['detail']?.toString() ?? fallback);
+      }
+      final buffer = StringBuffer();
+      for (final entry in decoded.entries) {
+        final value = entry.value;
+        if (value is List) {
+          final joined = value.map((item) => item.toString()).join(' ');
+          if (joined.isNotEmpty) {
+            if (buffer.isNotEmpty) buffer.write(' ');
+            buffer.write('$joined');
+          }
+        } else if (value is String) {
+          if (buffer.isNotEmpty) buffer.write(' ');
+          buffer.write(value);
+        }
+      }
+      final message = buffer.isNotEmpty ? buffer.toString() : fallback;
+      return Exception(message);
+    }
+    return Exception(fallback);
   }
 
   void addBooking(Booking booking) {

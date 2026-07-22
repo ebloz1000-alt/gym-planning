@@ -113,9 +113,11 @@ class MembershipRecord(models.Model):
     def is_bookable(self):
         now = timezone.now()
         payment_open = (
-            self.payment_status != PaymentStatus.PAY_LATER
-            or self.payment_due_at is None
-            or self.payment_due_at > now
+            self.payment_status == PaymentStatus.CONFIRMED
+            or (
+                self.payment_status == PaymentStatus.PAY_LATER
+                and (self.payment_due_at is None or self.payment_due_at > now)
+            )
         )
         return self.status.lower() == "active" and self.expires_at > now and payment_open
 

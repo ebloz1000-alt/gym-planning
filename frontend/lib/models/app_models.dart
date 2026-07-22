@@ -93,6 +93,7 @@ class AppUser {
 
 class MembershipPlan {
   const MembershipPlan({
+    required this.id,
     required this.name,
     required this.durationDays,
     required this.price,
@@ -101,6 +102,7 @@ class MembershipPlan {
   });
 
   static const MembershipPlan fallback = MembershipPlan(
+    id: 0,
     name: 'Monthly',
     durationDays: 30,
     price: 6800,
@@ -108,6 +110,7 @@ class MembershipPlan {
     highlight: true,
   );
 
+  final int id;
   final String name;
   final int durationDays;
   final double price;

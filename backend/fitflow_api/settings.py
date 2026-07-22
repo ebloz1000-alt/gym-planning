@@ -27,7 +27,7 @@ DEBUG = env_bool("DEBUG", True)
 
 ALLOWED_HOSTS = env_list(
     "ALLOWED_HOSTS",
-    "localhost,127.0.0.1,0.0.0.0,fitflow-gym-api.onrender.com,fitflow-gym-frontend.onrender.com",
+    "localhost,127.0.0.1,0.0.0.0,testserver,fitflow-gym-api.onrender.com,fitflow-gym-frontend.onrender.com",
 )
 CSRF_TRUSTED_ORIGINS = env_list(
     "CSRF_TRUSTED_ORIGINS",

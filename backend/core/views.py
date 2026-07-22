@@ -3,9 +3,9 @@ import uuid
 
 from django.contrib.auth.models import User
 from django.db import connection
-from django.db.models import Count, Sum
+from django.db.models import Count, Q, Sum
 from django.utils import timezone
-from rest_framework import permissions, status, viewsets
+from rest_framework import permissions, serializers, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -15,6 +15,7 @@ from core.models import (
     Booking,
     BookingStatus,
     EquipmentItem,
+    EquipmentStatus,
     FeedbackEntry,
     MembershipPlan,
     MembershipRecord,
@@ -295,7 +296,34 @@ class BookingViewSet(viewsets.ModelViewSet):
         return queryset.filter(user=user)
 
     def perform_create(self, serializer):
-        serializer.save(user=self.request.user)
+        user = self.request.user
+        now = timezone.now()
+        active_membership_exists = MembershipRecord.objects.filter(
+            user=user,
+            status__iexact="Active",
+            expires_at__gt=now,
+        ).filter(
+            Q(payment_status=PaymentStatus.CONFIRMED)
+            | Q(payment_status=PaymentStatus.PAY_LATER, payment_due_at__isnull=True)
+            | Q(payment_status=PaymentStatus.PAY_LATER, payment_due_at__gt=now)
+        ).exists()
+        if not active_membership_exists:
+            raise serializers.ValidationError(
+                "You must have an active membership with confirmed payment or an open Pay Later balance to book."
+            )
+
+        equipment = serializer.validated_data.get("equipment")
+        if equipment and equipment.available <= 0:
+            raise serializers.ValidationError("This equipment is fully booked.")
+
+        booking = serializer.save(user=user)
+        if equipment is not None:
+            equipment.booked += 1
+            equipment.status = (
+                EquipmentStatus.FULL if equipment.booked >= equipment.capacity else EquipmentStatus.AVAILABLE
+            )
+            equipment.save(update_fields=["booked", "status"])
+        return booking
 
     @action(detail=True, methods=["post"])
     def cancel(self, request, pk=None):
@@ -353,7 +381,8 @@ class PaymentRecordViewSet(viewsets.ModelViewSet):
             payment.booking.save(update_fields=["payment_status", "updated_at"])
         if payment.membership_id:
             payment.membership.payment_status = PaymentStatus.CONFIRMED
-            payment.membership.save(update_fields=["payment_status"])
+            payment.membership.status = "Active"
+            payment.membership.save(update_fields=["payment_status", "status"])
         return Response(self.get_serializer(payment).data)
 
 

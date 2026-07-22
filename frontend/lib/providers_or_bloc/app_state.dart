@@ -33,13 +33,6 @@ class AppState extends ChangeNotifier {
 
   Future<void> bootstrap() async {
     if (isBootstrapped) return;
-    if (kDebugMode && !kReleaseMode) {
-      isBootstrapped = true;
-      appVersionStatus = 'Ready';
-      jwtStatus = 'Skipped in test mode';
-      notifyListeners();
-      return;
-    }
     appVersionStatus = 'Checking version';
     notifyListeners();
     try {
@@ -52,6 +45,7 @@ class AppState extends ChangeNotifier {
       currentUser = repository.currentUser;
       currentRole = currentUser?.role;
       if (repository.isAuthenticated) {
+        hasCompletedOnboarding = true;
         notifyListeners();
       }
     } catch (_) {
@@ -82,12 +76,17 @@ class AppState extends ChangeNotifier {
     try {
       await repository.login(email: email, password: password);
       rememberMe = remember;
-      currentRole = role;
       currentUser = repository.currentUser;
+      currentRole = currentUser?.role ?? role;
       jwtStatus = remember ? 'JWT stored and valid' : 'Session token valid';
+      if (currentUser?.role == UserRole.trainer) {
+        currentRole = UserRole.trainer;
+      } else if (currentUser?.role == UserRole.admin) {
+        currentRole = UserRole.admin;
+      }
       return true;
     } catch (error) {
-      jwtStatus = error.toString();
+      jwtStatus = _normalizeErrorMessage(error);
       return false;
     } finally {
       isRefreshingSession = false;
@@ -100,6 +99,8 @@ class AppState extends ChangeNotifier {
     required String email,
     required String phone,
     required String password,
+    int? planId,
+    int? durationDays,
   }) async {
     isRefreshingSession = true;
     notifyListeners();
@@ -109,13 +110,20 @@ class AppState extends ChangeNotifier {
         email: email,
         phone: phone,
         password: password,
+        planId: planId,
+        durationDays: durationDays,
       );
-      currentRole = UserRole.member;
       currentUser = repository.currentUser;
+      currentRole = currentUser?.role ?? UserRole.member;
+      if (currentUser?.role == UserRole.trainer) {
+        currentRole = UserRole.trainer;
+      } else if (currentUser?.role == UserRole.admin) {
+        currentRole = UserRole.admin;
+      }
       jwtStatus = 'JWT issued after registration';
       return true;
     } catch (error) {
-      jwtStatus = error.toString();
+      jwtStatus = _normalizeErrorMessage(error);
       return false;
     } finally {
       isRefreshingSession = false;
@@ -131,7 +139,7 @@ class AppState extends ChangeNotifier {
       await repository.refreshJwt();
       jwtStatus = 'JWT refreshed just now';
     } catch (error) {
-      jwtStatus = error.toString();
+      jwtStatus = _normalizeErrorMessage(error);
       rethrow;
     } finally {
       isRefreshingSession = false;
@@ -166,6 +174,11 @@ class AppState extends ChangeNotifier {
   void setLanguage(String value) {
     language = value;
     notifyListeners();
+  }
+
+  String _normalizeErrorMessage(Object error) {
+    final raw = error.toString();
+    return raw.replaceFirst(RegExp(r'^Exception:\s*'), '').trim();
   }
 
   void setNotificationsEnabled(bool value) {
@@ -267,12 +280,14 @@ class AppState extends ChangeNotifier {
     required int durationDays,
     required String phone,
     required double amount,
+    required String paymentStatus,
   }) async {
     await repository.renewMembership(
       plan: plan,
       durationDays: durationDays,
       phone: phone,
       amount: amount,
+      paymentStatus: paymentStatus,
     );
     notifyListeners();
   }
@@ -292,9 +307,14 @@ class AppState extends ChangeNotifier {
 
   void submitCashMembershipPayment({
     required MembershipPlan plan,
+    required int durationDays,
     required double amount,
   }) {
-    repository.submitCashMembershipPayment(plan: plan, amount: amount);
+    repository.submitCashMembershipPayment(
+      plan: plan,
+      durationDays: durationDays,
+      amount: amount,
+    );
     notifyListeners();
   }
 
@@ -309,6 +329,7 @@ class AppState extends ChangeNotifier {
       durationDays: durationDays,
       phone: '',
       amount: 0,
+      paymentStatus: 'confirmed',
     );
     notifyListeners();
   }

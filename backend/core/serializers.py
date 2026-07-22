@@ -1,3 +1,4 @@
+import uuid
 from datetime import timedelta
 
 from django.contrib.auth.models import User
@@ -91,6 +92,12 @@ class RegisterSerializer(serializers.Serializer):
     email = serializers.EmailField()
     phone = serializers.CharField(max_length=32, required=False, allow_blank=True)
     password = serializers.CharField(write_only=True, min_length=8)
+    plan_id = serializers.PrimaryKeyRelatedField(
+        queryset=MembershipPlan.objects.filter(active=True),
+        required=False,
+        allow_null=True,
+    )
+    duration_days = serializers.IntegerField(required=False, min_value=1)
 
     def validate_email(self, value):
         value = value.lower().strip()
@@ -116,6 +123,20 @@ class RegisterSerializer(serializers.Serializer):
                 "avatar_label": initials_for_name(name),
             },
         )
+
+        plan = validated_data.get("plan_id")
+        if plan is not None:
+            started_at = timezone.now()
+            duration = int(validated_data.get("duration_days") or plan.duration_days)
+            MembershipRecord.objects.create(
+                user=user,
+                plan=plan,
+                started_at=started_at,
+                expires_at=started_at + timedelta(days=duration),
+                status="Pending",
+                payment_status=PaymentStatus.PENDING,
+            )
+
         return user
 
     def to_representation(self, instance):
@@ -356,33 +377,61 @@ class FeedbackEntrySerializer(serializers.ModelSerializer):
 
 class RenewMembershipSerializer(serializers.Serializer):
     plan_id = serializers.PrimaryKeyRelatedField(queryset=MembershipPlan.objects.filter(active=True))
+    duration_days = serializers.IntegerField(required=False, min_value=1)
+    amount = serializers.DecimalField(max_digits=10, decimal_places=2)
     payment_status = serializers.ChoiceField(
         choices=PaymentStatus.choices,
         default=PaymentStatus.CONFIRMED,
     )
     payment_due_at = serializers.DateTimeField(required=False, allow_null=True)
 
+    def _default_payment_due_at(self):
+        now = timezone.now()
+        due_at = now.replace(hour=12, minute=0, second=0, microsecond=0)
+        if due_at <= now:
+            due_at = due_at + timedelta(days=1)
+        return due_at
+
     def save(self, **kwargs):
         user = self.context["request"].user
         plan = self.validated_data["plan_id"]
+        duration_days = int(self.validated_data.get("duration_days") or plan.duration_days)
+        amount = self.validated_data["amount"]
+        payment_status = self.validated_data["payment_status"]
+        payment_due_at = self.validated_data.get("payment_due_at")
+        if payment_status == PaymentStatus.PAY_LATER and payment_due_at is None:
+            payment_due_at = self._default_payment_due_at()
+
         started_at = timezone.now()
+        if payment_status == PaymentStatus.PAY_LATER:
+            method = "Pay Later"
+            record_status = "Active"
+            payment_status_for_record = PaymentStatus.PENDING
+        elif payment_status == PaymentStatus.PENDING:
+            method = "Cash"
+            record_status = "Pending"
+            payment_status_for_record = PaymentStatus.PENDING
+        else:
+            method = "M-Pesa STK"
+            record_status = "Active"
+            payment_status_for_record = payment_status
+
         record = MembershipRecord.objects.create(
             user=user,
             plan=plan,
             started_at=started_at,
-            expires_at=started_at + timedelta(days=plan.duration_days),
-            status="Active",
-            payment_status=self.validated_data["payment_status"],
-            payment_due_at=self.validated_data.get("payment_due_at"),
+            expires_at=started_at + timedelta(days=duration_days),
+            status=record_status,
+            payment_status=payment_status,
+            payment_due_at=payment_due_at,
         )
+
         PaymentRecord.objects.create(
             user=user,
             membership=record,
-            method="Pay Later" if record.payment_status == PaymentStatus.PAY_LATER else "M-Pesa STK",
-            amount=plan.price,
-            status=record.payment_status
-            if record.payment_status != PaymentStatus.PAY_LATER
-            else PaymentStatus.PENDING,
-            reference=f"MEM-{record.id:06d}",
+            method=method,
+            amount=amount,
+            status=payment_status_for_record,
+            reference=f"MEM-{uuid.uuid4().hex[:10].upper()}",
         )
         return record

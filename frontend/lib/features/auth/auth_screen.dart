@@ -758,7 +758,7 @@ class _AuthScreenState extends State<AuthScreen> {
     if (!mounted) return;
     setState(() => _busy = false);
     if (!success) {
-      _showFeedback('Unable to sign in. Check your credentials and try again.');
+      _showFeedback(state.jwtStatus.isNotEmpty ? state.jwtStatus : 'Unable to sign in. Check your credentials and try again.');
     }
   }
 
@@ -780,7 +780,9 @@ class _AuthScreenState extends State<AuthScreen> {
       );
       setState(() => _mode = _AuthMode.signIn);
     } else {
-      _showFeedback('Unable to create account. Please try again.');
+      _showFeedback(state.jwtStatus.isNotEmpty && state.jwtStatus != 'JWT issued after registration'
+          ? state.jwtStatus
+          : 'Unable to create account. Please try again.');
     }
   }
 

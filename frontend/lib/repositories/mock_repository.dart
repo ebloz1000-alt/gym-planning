@@ -60,6 +60,7 @@ class MockRepository {
 
   final List<MembershipPlan> membershipPlans = const [
     MembershipPlan(
+      id: 1,
       name: 'Daily',
       durationDays: 1,
       price: 400,
@@ -71,6 +72,7 @@ class MockRepository {
       ],
     ),
     MembershipPlan(
+      id: 2,
       name: 'Weekly',
       durationDays: 7,
       price: 2200,
@@ -78,6 +80,7 @@ class MockRepository {
       features: ['7-day access', '2 trainer sessions', 'Booking priority'],
     ),
     MembershipPlan(
+      id: 3,
       name: 'Monthly',
       durationDays: 30,
       price: 6800,
@@ -85,6 +88,7 @@ class MockRepository {
       features: ['Unlimited access', '8 trainer sessions', 'Progress review'],
     ),
     MembershipPlan(
+      id: 4,
       name: 'VIP',
       durationDays: 45,
       price: 12000,
@@ -401,7 +405,7 @@ class MockRepository {
   AppUser userForRole(UserRole role) =>
       _users.firstWhere((user) => user.role == role);
 
-  MembershipRecord get currentMembership => membershipHistory.first;
+  MembershipRecord? get currentMembership => membershipHistory.isNotEmpty ? membershipHistory.last : null;
   MembershipRecord? get activeMembership {
     for (final membership in membershipHistory) {
       if (membership.isBookable) return membership;

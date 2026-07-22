@@ -148,41 +148,75 @@ class _BookingScreenState extends State<BookingScreen> {
 
   FeaturePage _membershipRequiredView(AppState state) {
     final current = state.repository.currentMembership;
-    final status = current.isBookable ? current.status : 'Expired';
+    final status = current?.isBookable == true ? current!.status : 'Expired';
     return FeaturePage(
       title: 'Book Session',
       subtitle:
           'Membership must be active before booking equipment or trainers.',
       children: [
-        AppCard(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  const Icon(Icons.workspace_premium_outlined),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      '${current.plan} membership',
-                      style: Theme.of(context).textTheme.titleMedium,
+        if (current != null)
+          AppCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.workspace_premium_outlined),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        '${current.plan} membership',
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
                     ),
-                  ),
-                  Chip(label: Text(status)),
-                ],
-              ),
-              const SizedBox(height: 10),
-              Text('Expires ${formatDate(current.expiresAt)}'),
-              const SizedBox(height: 12),
-              AppButton(
-                label: 'Select or Renew Membership',
-                icon: Icons.restart_alt_outlined,
-                expand: true,
-                onPressed: widget.onOpenMembership,
-              ),
-            ],
+                    Chip(label: Text(status)),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Text('Expires ${formatDate(current.expiresAt)}'),
+                const SizedBox(height: 12),
+                AppButton(
+                  label: 'Select or Renew Membership',
+                  icon: Icons.restart_alt_outlined,
+                  expand: true,
+                  onPressed: widget.onOpenMembership,
+                ),
+              ],
+            ),
+          )
+        else
+          AppCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.workspace_premium_outlined),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        'No active membership',
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                    ),
+                    const Chip(label: Text('Required')),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  'You don\'t have an active membership. Please select and renew a membership to unlock booking access.',
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
+                const SizedBox(height: 12),
+                AppButton(
+                  label: 'Select or Renew Membership',
+                  icon: Icons.restart_alt_outlined,
+                  expand: true,
+                  onPressed: widget.onOpenMembership,
+                ),
+              ],
+            ),
           ),
-        ),
       ],
     );
   }

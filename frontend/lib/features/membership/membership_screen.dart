@@ -37,8 +37,24 @@ class _MembershipScreenState extends State<MembershipScreen> {
     final state = AppScope.watch(context);
     final repo = state.repository;
     final current = repo.currentMembership;
-    final currentStatus = current.isBookable ? current.status : 'Expired';
-    final selectedPlan = repo.membershipPlanByName(_selectedPlan);
+    
+    // Check if membership is expired or doesn't exist
+    final isExpired = current != null && !current.isBookable && current.expiresAt.isBefore(DateTime.now());
+    
+    final currentStatus = current != null && current.isBookable ? current.status : (isExpired ? 'Expired' : 'No membership');
+    final fallbackPlan = repo.membershipPlans.isNotEmpty
+        ? repo.membershipPlans.first
+        : const MembershipPlan(
+            id: 0,
+            name: 'Monthly',
+            durationDays: 30,
+            price: 0,
+            features: [],
+            highlight: false,
+          );
+    final selectedPlan = repo.membershipPlans.any((plan) => plan.name == _selectedPlan)
+        ? repo.membershipPlanByName(_selectedPlan)
+        : fallbackPlan;
     final selectedPrice = _priceFor(selectedPlan);
     final selectedDuration = selectedPlan.name == 'VIP'
         ? _vipDuration
@@ -47,56 +63,106 @@ class _MembershipScreenState extends State<MembershipScreen> {
       title: 'Membership',
       subtitle: 'Plans, renewals, countdowns, and membership history.',
       children: [
-        AppCard(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      '${current.plan} plan',
-                      style: Theme.of(context).textTheme.titleLarge,
-                    ),
-                  ),
-                  StatusBadge(label: currentStatus),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Text('Started ${formatDate(current.startedAt)}'),
-              Text('Expires ${formatDate(current.expiresAt)}'),
-              const SizedBox(height: 12),
-              LinearProgressIndicator(
-                value: 0.6,
-                minHeight: 8,
-                borderRadius: BorderRadius.circular(999),
-              ),
-              const SizedBox(height: 10),
-              Text(formatCountdown(current.expiresAt)),
-              if (current.paymentStatus != PaymentStatus.confirmed) ...[
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
+        // Show current membership or renewal prompt
+        if (current != null)
+          AppCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
                   children: [
-                    StatusBadge(label: current.paymentStatus.label),
-                    if (current.paymentDueAt != null)
-                      Chip(
-                        label: Text(
-                          'Due 12:00 PM, ${formatDate(current.paymentDueAt!)}',
-                        ),
+                    Expanded(
+                      child: Text(
+                        '${current.plan} plan',
+                        style: Theme.of(context).textTheme.titleLarge,
                       ),
+                    ),
+                    StatusBadge(label: currentStatus),
                   ],
                 ),
+                const SizedBox(height: 8),
+                Text('Started ${formatDate(current.startedAt)}'),
+                Text('Expires ${formatDate(current.expiresAt)}'),
+                const SizedBox(height: 12),
+                LinearProgressIndicator(
+                  value: 0.6,
+                  minHeight: 8,
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                const SizedBox(height: 10),
+                Text(formatCountdown(current.expiresAt)),
+                if (current.paymentStatus != PaymentStatus.confirmed) ...[
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      StatusBadge(label: current.paymentStatus.label),
+                      if (current.paymentDueAt != null)
+                        Chip(
+                          label: Text(
+                            'Due 12:00 PM, ${formatDate(current.paymentDueAt!)}',
+                          ),
+                        ),
+                    ],
+                  ),
+                ],
+                const SizedBox(height: 8),
+                Text(
+                  'Booking access is unlocked only while this membership is active.',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
               ],
-              const SizedBox(height: 8),
-              Text(
-                'Booking access is unlocked only while this membership is active.',
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-            ],
+            ),
+          )
+        else
+          AppCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        'No active membership',
+                        style: Theme.of(context).textTheme.titleLarge,
+                      ),
+                    ),
+                    const StatusBadge(label: 'Action needed'),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'You don\'t have an active membership. Please select and renew a membership below to unlock booking access.',
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
+              ],
+            ),
           ),
-        ),
+        if (isExpired)
+          AppCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        'Membership expired',
+                        style: Theme.of(context).textTheme.titleLarge?.copyWith(color: Colors.red),
+                      ),
+                    ),
+                    const StatusBadge(label: 'Expired'),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Your ${current.plan} membership expired on ${formatDate(current.expiresAt)}. Renew your membership below by selecting a new plan to regain booking access.',
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
+              ],
+            ),
+          ),
         const SectionHeader(title: 'Choose a plan'),
         ...repo.membershipPlans.map((plan) {
           final selected = _selectedPlan == plan.name;
@@ -402,7 +468,11 @@ class _MembershipScreenState extends State<MembershipScreen> {
         amount: amount,
       );
     } else if (_paymentMethod == 'Cash') {
-      state.submitCashMembershipPayment(plan: plan, amount: amount);
+      state.submitCashMembershipPayment(
+        plan: plan,
+        durationDays: durationDays,
+        amount: amount,
+      );
       await Future<void>.delayed(const Duration(milliseconds: 250));
     } else {
       final error = await _sendStkPush(state, _mpesaPhone.text.trim(), amount, plan.name, durationDays);
