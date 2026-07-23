@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
-import '../../core/constants/app_constants.dart';
 import '../../core/utils/formatters.dart';
+import '../../core/utils/report_export.dart';
 import '../../core/widgets/app_button.dart';
 import '../../core/widgets/app_cards.dart';
 import '../../core/widgets/app_charts.dart';
@@ -9,10 +9,6 @@ import '../../core/widgets/state_views.dart';
 import '../../core/widgets/status_badge.dart';
 import '../../models/app_models.dart';
 import '../../providers_or_bloc/app_state.dart';
-import 'package:http/http.dart' as http;
-import 'dart:io';
-import 'package:path_provider/path_provider.dart';
-import 'package:open_file/open_file.dart';
 
 class AdminDashboard extends StatelessWidget {
   const AdminDashboard({super.key});
@@ -182,31 +178,13 @@ class AdminDashboard extends StatelessWidget {
 
   Future<void> _exportDashboardReport(BuildContext context, String format) async {
     final repo = AppScope.read(context).repository;
-    final readyRows = repo.reportRows
-        .where((row) => row.status.toLowerCase() == 'ready')
-        .length;
-    final uri = Uri.parse('${AppConstants.apiBaseUrl}/api/exports/reports/?format=${format.toLowerCase()}&range=Dashboard');
+    final messenger = ScaffoldMessenger.of(context);
     try {
-      final resp = await http.get(uri).timeout(const Duration(seconds: 15));
-      if (resp.statusCode != 200) {
-        _showSnack(context, 'Export failed: ${resp.body}');
-        return;
-      }
-      final docsDir = await getApplicationDocumentsDirectory();
-      final exportDir = Directory('${docsDir.path}/reports');
-      if (!await exportDir.exists()) await exportDir.create(recursive: true);
-      final extension = resp.headers['content-type']?.contains('pdf') == true ? 'pdf' : 'xlsx';
-      final timestamp = DateTime.now().toIso8601String().replaceAll(':', '-').replaceAll('.', '-');
-      final fileName = 'dashboard_$timestamp.$extension';
-      final file = File('${exportDir.path}/$fileName');
-      await file.writeAsBytes(resp.bodyBytes);
-      await OpenFile.open(file.path);
-      _showSnack(
-        context,
-        'Dashboard $format export saved with $readyRows ready sections.\n${file.path}',
-      );
+      final path = await ReportExporter.saveExportFile(format, 'Dashboard', repo.reportRows);
+      await ReportExporter.openExportFile(path);
+      messenger.showSnackBar(SnackBar(content: Text('Dashboard $format export saved to $path')));
     } catch (e) {
-      _showSnack(context, 'Export failed: $e');
+      messenger.showSnackBar(SnackBar(content: Text('Export failed: $e')));
     }
   }
 
@@ -332,9 +310,9 @@ class _AdminEquipmentManagementScreenState
                       label: const Text('Edit'),
                     ),
                     OutlinedButton.icon(
-                      onPressed: () => _markMaintenance(context, item),
-                      icon: const Icon(Icons.construction_outlined),
-                      label: const Text('Maintenance'),
+                      onPressed: () => _showEquipmentStatusSheet(context, item),
+                      icon: const Icon(Icons.sync_alt_outlined),
+                      label: const Text('Status'),
                     ),
                     OutlinedButton.icon(
                       onPressed: () => _deleteEquipment(context, item),
@@ -353,7 +331,6 @@ class _AdminEquipmentManagementScreenState
 
   void _showEquipmentForm(BuildContext context, {EquipmentItem? item}) {
     final state = AppScope.read(context);
-    final parentContext = context;
     showModalBottomSheet<void>(
       context: context,
       showDragHandle: true,
@@ -368,7 +345,7 @@ class _AdminEquipmentManagementScreenState
           }
           Navigator.of(sheetContext).pop();
           _showSnack(
-            parentContext,
+            context,
             item == null
                 ? '${updated.name} added to inventory.'
                 : '${updated.name} updated.',
@@ -378,17 +355,43 @@ class _AdminEquipmentManagementScreenState
     );
   }
 
-  void _markMaintenance(BuildContext context, EquipmentItem item) {
-    final nextStatus = item.status == EquipmentStatus.maintenance
-        ? EquipmentStatus.available
-        : EquipmentStatus.maintenance;
-    AppScope.read(context).updateEquipment(item.copyWith(status: nextStatus));
-    _showSnack(context, '${item.name} marked ${nextStatus.label}.');
-  }
-
   void _deleteEquipment(BuildContext context, EquipmentItem item) {
     AppScope.read(context).deleteEquipment(item);
     _showSnack(context, '${item.name} removed from inventory.');
+  }
+
+  void _showEquipmentStatusSheet(BuildContext context, EquipmentItem item) {
+    showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetContext) => Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Set status for ${item.name}',
+              style: Theme.of(sheetContext).textTheme.titleMedium,
+            ),
+            const SizedBox(height: 12),
+            ...EquipmentStatus.values.map(
+              (status) => ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: StatusBadge(label: status.label, compact: true),
+                title: Text(status.label),
+                selected: item.status == status,
+                onTap: () {
+                  AppScope.read(context).updateEquipment(item.copyWith(status: status));
+                  Navigator.of(sheetContext).pop();
+                  _showSnack(context, '${item.name} status updated to ${status.label}.');
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 

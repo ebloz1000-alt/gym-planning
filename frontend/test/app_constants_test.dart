@@ -14,9 +14,15 @@ void main() {
     expect(value, 'http://10.0.2.2:8000');
   });
 
-  test('uses localhost for web builds', () {
+  test('uses localhost for web debug builds', () {
     final value = AppConstants.resolveApiBaseUrl(isWeb: true);
 
     expect(value, 'http://localhost:8000');
+  });
+
+  test('uses the deployed backend URL for web release builds', () {
+    final value = AppConstants.resolveApiBaseUrl(isWeb: true, isProduction: true);
+
+    expect(value, 'https://fitflow-gym-api.onrender.com');
   });
 }

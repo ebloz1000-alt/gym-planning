@@ -15,6 +15,7 @@ class AppConstants {
     String? fromEnv,
     bool? isAndroid,
     bool? isWeb,
+    bool? isProduction,
   }) {
     final explicitUrl = fromEnv ?? const String.fromEnvironment('API_BASE_URL');
     if (explicitUrl.isNotEmpty) {
@@ -23,6 +24,10 @@ class AppConstants {
 
     final web = isWeb ?? kIsWeb;
     if (web) {
+      final production = isProduction ?? kReleaseMode;
+      if (production) {
+        return 'https://fitflow-gym-api.onrender.com';
+      }
       return 'http://localhost:8000';
     }
 

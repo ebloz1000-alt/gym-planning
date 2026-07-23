@@ -20,20 +20,34 @@ class _PaymentScreenState extends State<PaymentScreen> {
   PaymentStatus _previewStatus = PaymentStatus.pending;
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final state = AppScope.read(context);
+    if (state.currentRole == UserRole.admin && _method == 'M-Pesa') {
+      _method = 'Cash';
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     final state = AppScope.watch(context);
     final repo = state.repository;
-    final pendingCash = repo.payments
-        .where(
-          (payment) =>
-              payment.method == 'Cash' &&
-              payment.status == PaymentStatus.pending,
-        )
+    final isAdmin = state.currentRole == UserRole.admin;
+    final availableMethods = isAdmin
+        ? ['Cash', 'Pay Later']
+        : ['M-Pesa', 'Cash', 'Pay Later'];
+    final currentMethod = availableMethods.contains(_method)
+        ? _method
+        : availableMethods.first;
+    final pendingApprovals = repo.payments
+        .where((payment) =>
+            payment.status == PaymentStatus.pending &&
+            (payment.method == 'Cash' || payment.method == 'Pay Later'))
         .toList();
     return FeaturePage(
       title: 'Payments',
       subtitle:
-          'M-Pesa STK Push, cash, Pay Later, retry, receipts, and history.',
+          'Cash, Pay Later, receipts, and approval management.',
       children: [
         AppCard(
           child: Column(
@@ -41,24 +55,22 @@ class _PaymentScreenState extends State<PaymentScreen> {
             children: [
               const SectionHeader(title: 'Payment options'),
               SegmentedButton<String>(
-                segments: const [
-                  ButtonSegment(
-                    value: 'M-Pesa',
-                    icon: Icon(Icons.phone_android),
-                    label: Text('M-Pesa'),
-                  ),
-                  ButtonSegment(
-                    value: 'Cash',
-                    icon: Icon(Icons.payments_outlined),
-                    label: Text('Cash'),
-                  ),
-                  ButtonSegment(
-                    value: 'Pay Later',
-                    icon: Icon(Icons.schedule_outlined),
-                    label: Text('Later'),
-                  ),
-                ],
-                selected: {_method},
+                segments: availableMethods
+                    .map(
+                      (method) => ButtonSegment(
+                        value: method,
+                        icon: Icon(
+                          method == 'M-Pesa'
+                              ? Icons.phone_android
+                              : method == 'Cash'
+                                  ? Icons.payments_outlined
+                                  : Icons.schedule_outlined,
+                        ),
+                        label: Text(method == 'Pay Later' ? 'Later' : method),
+                      ),
+                    )
+                    .toList(),
+                selected: {currentMethod},
                 onSelectionChanged: (value) =>
                     setState(() => _method = value.first),
               ),
@@ -70,11 +82,11 @@ class _PaymentScreenState extends State<PaymentScreen> {
                   'Booking balance ${formatMoney(repo.payments.isEmpty ? 0 : repo.payments.fold<double>(0, (total, payment) => total + payment.amount))}',
                 ),
                 subtitle: Text(
-                  _method == 'M-Pesa'
+                  currentMethod == 'M-Pesa'
                       ? 'STK Push expires in 04:59'
-                      : _method == 'Cash'
-                      ? 'Mark as pending until front desk confirms'
-                      : 'Due before next booking',
+                      : currentMethod == 'Cash'
+                          ? 'Mark as pending until front desk confirms'
+                          : 'Due before next booking',
                 ),
                 trailing: StatusBadge(label: _previewStatus.label),
               ),
@@ -84,13 +96,15 @@ class _PaymentScreenState extends State<PaymentScreen> {
                 runSpacing: 10,
                 children: [
                   AppButton(
-                    label: _method == 'M-Pesa'
+                    label: currentMethod == 'M-Pesa'
                         ? 'Send STK Push'
-                        : _method == 'Cash'
-                        ? 'Submit Cash Approval'
-                        : 'Use Pay Later',
+                        : currentMethod == 'Cash'
+                            ? 'Submit Cash Approval'
+                            : 'Use Pay Later',
                     icon: Icons.send_to_mobile_outlined,
-                    onPressed: () => _recordPayment(state),
+                    onPressed: currentMethod == 'M-Pesa' && isAdmin
+                        ? null
+                        : () => _recordPayment(state, currentMethod),
                   ),
                   AppButton(
                     label: 'Retry',
@@ -105,26 +119,30 @@ class _PaymentScreenState extends State<PaymentScreen> {
           ),
         ),
         if (state.currentRole == UserRole.admin) ...[
-          const SectionHeader(title: 'Cash payment approvals'),
-          if (pendingCash.isEmpty)
+          const SectionHeader(title: 'Pending payment approvals'),
+          if (pendingApprovals.isEmpty)
             const AppCard(
               child: ListTile(
                 contentPadding: EdgeInsets.zero,
                 leading: Icon(Icons.fact_check_outlined),
-                title: Text('No cash approvals pending'),
-                subtitle: Text('New member cash payments will appear here.'),
+                title: Text('No approvals pending'),
+                subtitle: Text('Cash or Pay Later approvals will appear here.'),
               ),
             )
           else
-            ...pendingCash.map(
+            ...pendingApprovals.map(
               (payment) => AppCard(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     ListTile(
                       contentPadding: EdgeInsets.zero,
-                      leading: const Icon(Icons.payments_outlined),
-                      title: Text(formatMoney(payment.amount)),
+                      leading: Icon(
+                        payment.method == 'Pay Later'
+                            ? Icons.schedule_outlined
+                            : Icons.payments_outlined,
+                      ),
+                      title: Text('${payment.method} • ${formatMoney(payment.amount)}'),
                       subtitle: Text(
                         '${payment.reference}\n${formatDate(payment.createdAt)}',
                       ),
@@ -138,18 +156,30 @@ class _PaymentScreenState extends State<PaymentScreen> {
                       spacing: 8,
                       runSpacing: 8,
                       children: [
-                        OutlinedButton.icon(
-                          onPressed: () =>
-                              _showCashApprovalDialog(context, state, payment),
-                          icon: const Icon(Icons.verified_outlined),
-                          label: const Text('Approve Plan'),
-                        ),
+                        if (payment.method == 'Cash')
+                          OutlinedButton.icon(
+                            onPressed: () =>
+                                _showCashApprovalDialog(context, state, payment),
+                            icon: const Icon(Icons.verified_outlined),
+                            label: const Text('Approve Plan'),
+                          )
+                        else
+                          OutlinedButton.icon(
+                            onPressed: () {
+                              state.updatePayment(
+                                payment.copyWith(status: PaymentStatus.confirmed),
+                              );
+                              _showSnack(context, 'Pay Later approved.');
+                            },
+                            icon: const Icon(Icons.verified_outlined),
+                            label: const Text('Approve'),
+                          ),
                         OutlinedButton.icon(
                           onPressed: () {
                             state.updatePayment(
                               payment.copyWith(status: PaymentStatus.failed),
                             );
-                            _showSnack(context, 'Cash payment declined.');
+                            _showSnack(context, '${payment.method} payment declined.');
                           },
                           icon: const Icon(Icons.block_outlined),
                           label: const Text('Decline'),
@@ -187,33 +217,33 @@ class _PaymentScreenState extends State<PaymentScreen> {
     );
   }
 
-  void _recordPayment(AppState state) {
-    final status = _method == 'M-Pesa'
+  void _recordPayment(AppState state, String method) {
+    final status = method == 'M-Pesa'
         ? PaymentStatus.confirmed
-        : _method == 'Pay Later'
-        ? PaymentStatus.pending
-        : PaymentStatus.pending;
+        : method == 'Pay Later'
+            ? PaymentStatus.pending
+            : PaymentStatus.pending;
     setState(() => _previewStatus = status);
     state.addPayment(
       PaymentRecord(
         id: 'pay-${DateTime.now().millisecondsSinceEpoch}',
-        method: _method,
+        method: method,
         amount: 1200,
         status: status,
         createdAt: DateTime.now(),
         reference:
-            '${_method == 'Cash'
+            '${method == 'Cash'
                 ? 'CASH'
-                : _method == 'Pay Later'
-                ? 'LATER'
-                : 'TX'}-${DateTime.now().second}${DateTime.now().millisecond}',
+                : method == 'Pay Later'
+                    ? 'LATER'
+                    : 'TX'}-${DateTime.now().second}${DateTime.now().millisecond}',
       ),
     );
-    final message = _method == 'Cash'
+    final message = method == 'Cash'
         ? 'Cash payment recorded for admin approval.'
-        : _method == 'Pay Later'
-        ? 'Pay Later balance recorded. Pay before the deadline.'
-        : 'M-Pesa payment confirmed.';
+        : method == 'Pay Later'
+            ? 'Pay Later balance recorded. Pay before the deadline.'
+            : 'M-Pesa payment confirmed.';
     _showSnack(context, message);
   }
 
